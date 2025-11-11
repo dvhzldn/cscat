@@ -40,13 +40,12 @@ jobs:
           -backend-config="dynamodb_table=${{ secrets.TF_LOCK_TABLE }}"
         working-directory: ${{ env.TF_WORKING_DIR }}
 
-      - name: 🔄 One-Time State Cleanup for POST Method
-        # This step forces the state file to forget the old 'scan_method'
-        # that is conflicting with the new 'scan_post_method' resource name.
+      - name: 🔄 **CRITICAL** One-Time State Cleanup to Break Cycle
         run: |
-          echo "Attempting to remove old conflicting resource from state..."
-          # The '|| true' ensures the step doesn't fail if the resource is already gone.
+          echo "Forcing removal of old resource name 'aws_api_gateway_method.scan_method' from state."
+          # Use 'state pull' to get the latest state, run the removal, and ensure the working directory is correct.
           terraform state rm 'aws_api_gateway_method.scan_method' || true
+        working-directory: ${{ env.TF_WORKING_DIR }}
         shell: bash
 
       - name: Terraform Plan
