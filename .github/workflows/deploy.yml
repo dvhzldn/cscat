@@ -60,7 +60,8 @@ jobs:
       - name: Configure and Upload Frontend HTML
         run: |
           # Create index.html file with the API URL injected
-          sed "s|\[PASTE YOUR API GATEWAY URL HERE\]|${{ env.API_URL }}|g" index.html > final_index.html
+          # Using '@' as a delimiter in sed to safely handle slashes in the API_URL
+          sed "s@\[PASTE YOUR API GATEWAY URL HERE\]@${{ env.API_URL }}@g" index.html > final_index.html
 
           # Upload to S3 bucket root
           aws s3 cp final_index.html s3://${{ secrets.REPORT_BUCKET_NAME }}/index.html \
