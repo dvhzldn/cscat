@@ -1,4 +1,3 @@
-# --- IAM Role and Policy ---
 resource "aws_iam_role" "lambda_exec_role" {
   name = "${var.project_name}-${var.environment}-lambda-role"
 
@@ -56,22 +55,19 @@ resource "aws_iam_role_policy" "lambda_permissions_policy" {
 
 data "aws_caller_identity" "current" {}
 
-
-# --- AWS Lambda Function ---
 resource "aws_lambda_function" "scanner_function" {
   function_name = "${var.project_name}-${var.environment}-scanner"
   role          = aws_iam_role.lambda_exec_role.arn
-  package_type  = "Image"
-  image_uri    = "${aws_ecr_repository.scanner_repository.repository_url}:bootstrap"
-  architectures = ["x86_64"]
-  lifecycle {
-    ignore_changes = [
-      image_uri,
-    ]
-  }
+
+  package_type  = "Zip"
+  runtime       = "python3.9"
+  handler       = "app.lambda_handler"
+
+  s3_bucket     = aws_s3_bucket.report_bucket.id
+  s3_key        = "deployment/scanner.zip"
+
   timeout       = 30
   memory_size   = 128
-  handler       = "app.lambda_handler"
 
   environment {
     variables = {
@@ -85,7 +81,6 @@ resource "aws_lambda_function" "scanner_function" {
   }
 }
 
-# --- Scheduling with AWS EventBridge ---
 resource "aws_cloudwatch_event_rule" "schedule_rule" {
   name                = "${var.project_name}-${var.environment}-schedule"
   description         = "Triggers the security check every Monday at 10:00 AM UTC."

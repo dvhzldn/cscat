@@ -1,44 +1,33 @@
-# GitHub Actions Workflow for the Community Security Checkup Automation Tool (CSCAT)
-
 name: Deploy CSCAT Scanner to AWS
 
 on:
   push:
     branches:
       - main
-  workflow_dispatch: # Allows manual trigger of the workflow
+  workflow_dispatch:
 
 env:
-  # Define standard variables for project consistency
   AWS_REGION: eu-west-2
-  # This must match the name in iac/terraform/ecr.tf exactly
-  ECR_REPOSITORY: cscat-scanner-repository-261111
   TF_WORKING_DIR: iac/terraform
-  LAMBDA_FUNCTION_NAME: cscat-dev-scanner # Derived from project_name-environment-scanner
+  LAMBDA_FUNCTION_NAME: cscat-dev-scanner
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
     permissions:
-      id-token: write # Required for OIDC authentication
-      contents: read # Required to checkout the code
+      id-token: write
+      contents: read
 
     steps:
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      # 1. AUTHENTICATION: Configure AWS Credentials using OIDC
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          # Assumes the ARN of the IAM Role is stored as a repository secret
           role-to-assume: arn:aws:iam::${{secrets.AWS_ACCOUNT_ID}}:role/GitHubActions-DevSecOps-Role
           aws-region: ${{ env.AWS_REGION }}
 
-      # -------------------------------------------------------------
-      # 2. TERRAFORM: Setup and Initialise (Infrastructure CREATION)
-      # This step creates the ECR repository, Lambda IAM Role, and S3 bucket.
-      # -------------------------------------------------------------
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:
@@ -46,7 +35,6 @@ jobs:
 
       - name: Terraform Init
         id: init
-        # Pass backend configuration via secrets
         run: |
           terraform init -backend-config="bucket=${{ secrets.TF_STATE_BUCKET }}" \
           -backend-config="dynamodb_table=${{ secrets.TF_LOCK_TABLE }}"
@@ -57,43 +45,41 @@ jobs:
         run: terraform plan -input=false -out=tfplan
         working-directory: ${{ env.TF_WORKING_DIR }}
 
-      - name: Terraform Apply (CREATES ECR, LAMBDA ROLE, S3, etc.)
+      - name: Terraform Apply (CREATES INFRASTRUCTURE)
         run: terraform apply -auto-approve tfplan
         working-directory: ${{ env.TF_WORKING_DIR }}
 
       # -------------------------------------------------------------
-      # 3. DOCKER: Build and Push (Now that ECR exists)
+      # CODE PACKAGE AND DEPLOYMENT (Zip Method)
       # -------------------------------------------------------------
-      - name: Login to Amazon ECR
-        id: login-ecr
-        uses: aws-actions/amazon-ecr-login@v2
-
-      - name: Build and Tag Docker Image
-        id: build-image
-        shell: bash
+      - name: Package Python Code and Dependencies
+        id: package
         run: |
-          IMAGE_TAG=$(echo $GITHUB_SHA | cut -c1-8)
-          REPOSITORY_URI=${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}
+          # The pipeline needs Python dependencies installed for this step
+          pip install -r src/lambda_scanner/requirements.txt
 
-          echo "Building image tag: $IMAGE_TAG"
-          # BUILD CONTEXT CORRECTION: Build command uses the directory where Dockerfile, app.py, and requirements.txt reside.
-          docker build -t $REPOSITORY_URI:$IMAGE_TAG ./src/lambda_scanner
+          # Create a directory to assemble the package
+          mkdir -p package_dir
 
-          # Pass the repository URI and tag to subsequent steps as outputs
-          echo "repository_uri=$REPOSITORY_URI" >> $GITHUB_OUTPUT
-          echo "image_tag=$IMAGE_TAG" >> $GITHUB_OUTPUT
+          # Install dependencies into the package directory
+          pip install -r src/lambda_scanner/requirements.txt -t package_dir
 
-      - name: Push Docker Image to ECR
+          # Copy the Lambda handler code (app.py)
+          cp src/lambda_scanner/app.py package_dir/
+
+          # Create the final zip archive
+          cd package_dir
+          zip -r ../scanner.zip .
+          cd ..
+
+      - name: Upload Zip File to S3 Report Bucket
         run: |
-          docker push ${{ steps.build-image.outputs.repository_uri }}:${{ steps.build-image.outputs.image_tag }}
+          aws s3 cp scanner.zip s3://${{ secrets.REPORT_BUCKET_NAME }}/deployment/scanner.zip
 
-      # -------------------------------------------------------------
-      # 4. LAMBDA: Update (Final step after ECR is pushed)
-      # This step sets the Lambda function's source image to the newly pushed tag.
-      # -------------------------------------------------------------
-      - name: Update Lambda Function Code to use New ECR Image
+      - name: Update Lambda Function Code Source
         run: |
           aws lambda update-function-code \
             --function-name ${{ env.LAMBDA_FUNCTION_NAME }} \
-            --image-uri ${{ steps.build-image.outputs.repository_uri }}:${{ steps.build-image.outputs.image_tag }} \
+            --s3-bucket ${{ secrets.REPORT_BUCKET_NAME }} \
+            --s3-key deployment/scanner.zip \
             --region ${{ env.AWS_REGION }}
