@@ -62,6 +62,7 @@ resource "aws_lambda_function" "scanner_function" {
   function_name = "${var.project_name}-${var.environment}-scanner"
   role          = aws_iam_role.lambda_exec_role.arn
   package_type  = "Image"
+  architectures = ["x86_64"]
   image_uri    = "public.ecr.aws/lambda/python:3.9"
   lifecycle {
     ignore_changes = [
