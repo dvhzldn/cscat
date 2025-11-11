@@ -45,6 +45,26 @@ jobs:
         run: terraform plan -input=false -out=tfplan
         working-directory: ${{ env.TF_WORKING_DIR }}
 
+      - name: One-Time Terraform State Correction for API Gateway
+        id: state_fix
+        run: |
+          # 1. Get the REST API ID
+          API_ID=$(terraform state show aws_api_gateway_rest_api.scanner_api | grep "id" | awk '{print $2}' | tr -d '"')
+
+          # 2. Get the unique ID of the /scan resource
+          SCAN_RESOURCE_ID=$(terraform state show aws_api_gateway_resource.scan_resource | grep "id" | awk '{print $2}' | tr -d '"')
+
+          # 3. Remove the conflicting resource from Terraform state (it will likely fail the next step)
+          echo "Attempting to remove corrupted POST method from state..."
+          terraform state rm aws_api_gateway_method.scan_post_method || true
+
+          # 4. Import the existing live POST method back into the state
+          IMPORT_ID="${API_ID}/${SCAN_RESOURCE_ID}/POST"
+          echo "Importing existing POST method with ID: ${IMPORT_ID}"
+          terraform import aws_api_gateway_method.scan_post_method "${IMPORT_ID}"
+        # Setting shell to bash is usually implicit but ensures the variables work
+        shell: bash
+
       - name: Terraform Apply
         run: terraform apply -auto-approve tfplan
         working-directory: ${{ env.TF_WORKING_DIR }}
