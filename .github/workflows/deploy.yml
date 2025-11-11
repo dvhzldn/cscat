@@ -76,10 +76,15 @@ jobs:
         run: |
           aws s3 cp scanner.zip s3://${{ secrets.REPORT_BUCKET_NAME }}/deployment/scanner.zip
 
-      - name: Update Lambda Function Code Source
+      - name: Update Lambda Function Code Source and Handler
         run: |
           aws lambda update-function-code \
             --function-name ${{ env.LAMBDA_FUNCTION_NAME }} \
             --s3-bucket ${{ secrets.REPORT_BUCKET_NAME }} \
             --s3-key deployment/scanner.zip \
+            --region ${{ env.AWS_REGION }}
+
+          aws lambda update-function-configuration \
+            --function-name ${{ env.LAMBDA_FUNCTION_NAME }} \
+            --handler app.lambda_handler \
             --region ${{ env.AWS_REGION }}
