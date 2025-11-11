@@ -67,8 +67,6 @@ jobs:
       - name: Package Python Code and Dependencies
         id: package
         run: |
-          # The pipeline needs Python dependencies installed for this step
-          pip install -r src/lambda_scanner/requirements.txt
 
           # Create a directory to assemble the package
           mkdir -p package_dir
@@ -76,8 +74,8 @@ jobs:
           # Install dependencies into the package directory
           pip install -r src/lambda_scanner/requirements.txt -t package_dir
 
-          # Copy the Lambda handler code (app.py)
-          cp src/lambda_scanner/app.py package_dir/
+          # Copy the Lambda handler code
+          cp src/lambda_scanner/index.py package_dir/
 
           # Create the final zip archive
           cd package_dir

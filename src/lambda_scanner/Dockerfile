@@ -9,7 +9,7 @@ COPY requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
 # Copy the function code (app.py is in the same directory as the Dockerfile)
-COPY app.py .
+COPY index.py .
 
 # Set the CMD to your handler function (app.lambda_handler)
 CMD ["app.lambda_handler"]

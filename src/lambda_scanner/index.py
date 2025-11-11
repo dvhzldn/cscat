@@ -98,36 +98,36 @@ def scan_url(url, checks):
     return results
 
 
-def lambda_handler(event, context):
+def handler(event, context):
     """
     Handles the API Gateway request.
+    This function is now named 'handler' to match the standard configuration.
     """
 
     # 1. Parse the request body (comes as a JSON string in the event body)
     try:
+        # Note: API Gateway sends headers in 'headers', and body as a string.
         body = json.loads(event.get("body", "{}"))
         target_url = body.get("url", "").strip()
         checks_list = body.get("checks", [])
 
+        # CORS Headers for all responses (moved here for clarity)
+        cors_headers = {
+            "Access-Control-Allow-Origin": "*",
+            "Content-Type": "application/json",
+        }
+
         if not target_url:
             return {
                 "statusCode": 400,
-                # CRITICAL: Adding CORS headers to error response
-                "headers": {
-                    "Access-Control-Allow-Origin": "*",
-                    "Content-Type": "application/json",
-                },
+                "headers": cors_headers,
                 "body": json.dumps({"error": "Missing target URL in request body."}),
             }
 
     except json.JSONDecodeError:
         return {
             "statusCode": 400,
-            # CRITICAL: Adding CORS headers to error response
-            "headers": {
-                "Access-Control-Allow-Origin": "*",
-                "Content-Type": "application/json",
-            },
+            "headers": cors_headers,
             "body": json.dumps({"error": "Invalid JSON format in request body."}),
         }
 
@@ -137,10 +137,6 @@ def lambda_handler(event, context):
     # 3. Construct the final response with required CORS headers
     return {
         "statusCode": 200,
-        # CRITICAL: Adding CORS headers to the successful response
-        "headers": {
-            "Access-Control-Allow-Origin": "*",
-            "Content-Type": "application/json",
-        },
+        "headers": cors_headers,
         "body": json.dumps({"results": scan_results}),
     }

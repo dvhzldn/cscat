@@ -1,6 +1,6 @@
 data "archive_file" "placeholder" {
   type        = "zip"
-  source_content_filename = "app.py"
+  source_content_filename = "index.py"
   source_content = "def handler(event, context): return 'Initializing'"
   output_path = "${path.module}/placeholder.zip"
 }
