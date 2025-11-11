@@ -330,10 +330,7 @@
           return;
         }
 
-        if (
-          !API_BASE_URL ||
-          API_BASE_URL === "[PASTE YOUR API GATEWAY URL HERE]"
-        ) {
+        if (!API_BASE_URL) {
           showMessage(
             "The API Gateway URL is not configured. Please paste your Terraform output URL and reload this page.",
             "error"
