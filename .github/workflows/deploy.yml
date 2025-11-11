@@ -37,11 +37,12 @@ jobs:
 
       # -------------------------------------------------------------
       # 2. TERRAFORM: Setup and Initialise (Infrastructure CREATION)
+      # This step creates the ECR repository, Lambda IAM Role, and S3 bucket.
       # -------------------------------------------------------------
       - name: Setup Terraform
         uses: hashicorp/setup-terraform@v3
         with:
-          terraform_version: 1.6.0 # Use a stable, recent version
+          terraform_version: 1.6.0
 
       - name: Terraform Init
         id: init
@@ -75,7 +76,7 @@ jobs:
           REPOSITORY_URI=${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}
 
           echo "Building image tag: $IMAGE_TAG"
-
+          # BUILD CONTEXT CORRECTION: Build command uses the directory where Dockerfile, app.py, and requirements.txt reside.
           docker build -t $REPOSITORY_URI:$IMAGE_TAG ./src/lambda_scanner
 
           # Pass the repository URI and tag to subsequent steps as outputs
@@ -88,9 +89,9 @@ jobs:
 
       # -------------------------------------------------------------
       # 4. LAMBDA: Update (Final step after ECR is pushed)
+      # This step sets the Lambda function's source image to the newly pushed tag.
       # -------------------------------------------------------------
       - name: Update Lambda Function Code to use New ECR Image
-        # This points the Lambda function created in Step 2 to the new image pushed in Step 3.
         run: |
           aws lambda update-function-code \
             --function-name ${{ env.LAMBDA_FUNCTION_NAME }} \
