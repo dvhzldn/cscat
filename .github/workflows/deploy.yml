@@ -11,8 +11,10 @@ on:
 env:
   # Define standard variables for project consistency
   AWS_REGION: eu-west-2
+  # This must match the name in iac/terraform/ecr.tf exactly
   ECR_REPOSITORY: cscat-scanner-repository-261111
   TF_WORKING_DIR: iac/terraform
+  LAMBDA_FUNCTION_NAME: cscat-dev-scanner # Derived from project_name-environment-scanner
 
 jobs:
   deploy:
@@ -29,19 +31,44 @@ jobs:
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
+          # Assumes the ARN of the IAM Role is stored as a repository secret
           role-to-assume: arn:aws:iam::${{secrets.AWS_ACCOUNT_ID}}:role/GitHubActions-DevSecOps-Role
           aws-region: ${{ env.AWS_REGION }}
-          # The web identity token file path is automatically handled by the action
 
-      # 2. DOCKER: Log in to AWS ECR
+      # -------------------------------------------------------------
+      # 2. TERRAFORM: Setup and Initialise (Infrastructure CREATION)
+      # -------------------------------------------------------------
+      - name: Setup Terraform
+        uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: 1.6.0 # Use a stable, recent version
+
+      - name: Terraform Init
+        id: init
+        # Pass backend configuration via secrets
+        run: |
+          terraform init -backend-config="bucket=${{ secrets.TF_STATE_BUCKET }}" \
+          -backend-config="dynamodb_table=${{ secrets.TF_LOCK_TABLE }}"
+        working-directory: ${{ env.TF_WORKING_DIR }}
+
+      - name: Terraform Plan
+        id: plan
+        run: terraform plan -input=false -out=tfplan
+        working-directory: ${{ env.TF_WORKING_DIR }}
+
+      - name: Terraform Apply (CREATES ECR, LAMBDA ROLE, S3, etc.)
+        run: terraform apply -auto-approve tfplan
+        working-directory: ${{ env.TF_WORKING_DIR }}
+
+      # -------------------------------------------------------------
+      # 3. DOCKER: Build and Push (Now that ECR exists)
+      # -------------------------------------------------------------
       - name: Login to Amazon ECR
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
-      # 3. DOCKER: Build and Tag the Image
       - name: Build and Tag Docker Image
         id: build-image
-        # Get the current commit SHA to use as a unique image tag (Immutable tag best practice)
         shell: bash
         run: |
           IMAGE_TAG=$(echo $GITHUB_SHA | cut -c1-8)
@@ -55,43 +82,17 @@ jobs:
           echo "repository_uri=$REPOSITORY_URI" >> $GITHUB_OUTPUT
           echo "image_tag=$IMAGE_TAG" >> $GITHUB_OUTPUT
 
-      # 4. DOCKER: Push the Image to ECR
       - name: Push Docker Image to ECR
         run: |
           docker push ${{ steps.build-image.outputs.repository_uri }}:${{ steps.build-image.outputs.image_tag }}
 
-      # 5. TERRAFORM: Setup and Initialise
-      - name: Setup Terraform
-        uses: hashicorp/setup-terraform@v3
-        with:
-          terraform_version: 1.6.0 # Use a stable, recent version
-
-      - name: Terraform Init
-        id: init
-        # Now passing bucket/table names via secrets, matching your backend.tf which should only have the key/region.
-        run: |
-          terraform init -backend-config="bucket=${{ secrets.TF_STATE_BUCKET }}" \
-          -backend-config="dynamodb_table=${{ secrets.TF_LOCK_TABLE }}"
-        working-directory: ${{ env.TF_WORKING_DIR }}
-        env:
-          # Ensure Terraform uses the same credentials established via OIDC
-          AWS_ACCESS_KEY_ID: ${{ env.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ env.AWS_SECRET_ACCESS_KEY }}
-
-      # 6. TERRAFORM: Plan and Apply
-      - name: Terraform Plan
-        id: plan
-        run: terraform plan -input=false -out=tfplan
-        working-directory: ${{ env.TF_WORKING_DIR }}
-
-      - name: Terraform Apply
-        run: terraform apply -auto-approve tfplan
-        working-directory: ${{ env.TF_WORKING_DIR }}
-
-      # 7. LAMBDA: Update Function to use NEW Image Tag (Critical Step)
+      # -------------------------------------------------------------
+      # 4. LAMBDA: Update (Final step after ECR is pushed)
+      # -------------------------------------------------------------
       - name: Update Lambda Function Code to use New ECR Image
+        # This points the Lambda function created in Step 2 to the new image pushed in Step 3.
         run: |
           aws lambda update-function-code \
-            --function-name cscat-dev-scanner \
+            --function-name ${{ env.LAMBDA_FUNCTION_NAME }} \
             --image-uri ${{ steps.build-image.outputs.repository_uri }}:${{ steps.build-image.outputs.image_tag }} \
             --region ${{ env.AWS_REGION }}
