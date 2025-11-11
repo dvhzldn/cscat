@@ -11,7 +11,7 @@ on:
 env:
   # Define standard variables for project consistency
   AWS_REGION: eu-west-2
-  ECR_REPOSITORY: cscat-scanner-repository
+  ECR_REPOSITORY: cscat-scanner-repository-261111
   TF_WORKING_DIR: iac/terraform
 
 jobs:
