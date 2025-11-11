@@ -40,14 +40,6 @@ jobs:
           -backend-config="dynamodb_table=${{ secrets.TF_LOCK_TABLE }}"
         working-directory: ${{ env.TF_WORKING_DIR }}
 
-      - name: 🔄 **CRITICAL** One-Time State Cleanup to Break Cycle
-        run: |
-          echo "Forcing removal of old resource name 'aws_api_gateway_method.scan_method' from state."
-          # Use 'state pull' to get the latest state, run the removal, and ensure the working directory is correct.
-          terraform state rm 'aws_api_gateway_method.scan_method' || true
-        working-directory: ${{ env.TF_WORKING_DIR }}
-        shell: bash
-
       - name: Terraform Plan
         id: plan
         run: terraform plan -input=false -out=tfplan
