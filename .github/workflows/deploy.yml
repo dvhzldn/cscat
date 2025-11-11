@@ -45,9 +45,28 @@ jobs:
         run: terraform plan -input=false -out=tfplan
         working-directory: ${{ env.TF_WORKING_DIR }}
 
-      - name: Terraform Apply (CREATES INFRASTRUCTURE)
+      - name: Terraform Apply
         run: terraform apply -auto-approve tfplan
         working-directory: ${{ env.TF_WORKING_DIR }}
+
+      - name: Retrieve API URL from Terraform Output
+        id: get_outputs
+        run: |
+          # Retrieve the API Gateway URL output
+          API_URL=$(terraform output -raw api_gateway_url)
+          echo "API_URL=$API_URL" >> $GITHUB_ENV
+        working-directory: ${{ env.TF_WORKING_DIR }}
+
+      - name: Configure and Upload Frontend HTML
+        run: |
+          # Create index.html file with the API URL injected
+          sed "s|\[PASTE YOUR API GATEWAY URL HERE\]|${{ env.API_URL }}|g" index.html > final_index.html
+
+          # Upload to S3 bucket root
+          aws s3 cp final_index.html s3://${{ secrets.REPORT_BUCKET_NAME }}/index.html \
+            --content-type "text/html"
+
+          echo "Frontend index.html deployed to S3 website endpoint."
 
       - name: Package Python Code and Dependencies
         id: package
