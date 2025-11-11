@@ -45,6 +45,14 @@ resource "aws_s3_bucket" "report_bucket" {
   }
 }
 
+resource "aws_s3_bucket_public_access_block" "report_bucket_public_access" {
+  bucket = aws_s3_bucket.report_bucket.id
+  block_public_acls       = false
+  block_public_policy     = false
+  ignore_public_acls      = false
+  restrict_public_buckets = false
+}
+
 resource "aws_s3_bucket_policy" "website_read_policy" {
   bucket = aws_s3_bucket.report_bucket.id
   policy = jsonencode({
@@ -59,6 +67,7 @@ resource "aws_s3_bucket_policy" "website_read_policy" {
       },
     ]
   })
+  depends_on = [aws_s3_bucket_public_access_block.report_bucket_public_access]
 }
 
 # 3. Output the ECR Repository URI for the CI/CD pipeline
