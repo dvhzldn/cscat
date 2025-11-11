@@ -57,13 +57,12 @@ jobs:
           echo "API_URL=$API_URL" >> $GITHUB_ENV
         working-directory: ${{ env.TF_WORKING_DIR }}
 
-      - name: Configure and Upload Frontend HTML
+      - name: Configure and Upload Frontend HTML (Guaranteed Injection)
         run: |
-          sed -i "s@\[PASTE YOUR API GATEWAY URL HERE\]@${{ env.API_URL }}@g" index.html
+          sed "s@\[PASTE YOUR API GATEWAY URL HERE\]@${{ env.API_URL }}@g" index.html > final_index.html
           aws s3 cp final_index.html s3://${{ secrets.REPORT_BUCKET_NAME }}/index.html \
             --content-type "text/html"
-
-          echo "Frontend index.html deployed to S3 website endpoint: ${{ secrets.REPORT_BUCKET_NAME }}/index.html"
+          echo "Frontend index.html deployed successfully."
 
       - name: Package Python Code and Dependencies
         id: package
