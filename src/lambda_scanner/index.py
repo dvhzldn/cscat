@@ -1,142 +1,164 @@
 import json
 import requests
-from urllib.parse import urlparse
+from urllib.parse import urlparse, urlunparse
+import logging
+
+logger = logging.getLogger()
+logger.setLevel(logging.INFO)
+
+CORS_HEADERS = {
+    "Access-Control-Allow-Origin": "*",
+    "Access-Control-Allow-Methods": "OPTIONS,POST",
+    "Access-Control-Allow-Headers": (
+        "Content-Type,X-Amz-Date,Authorization,X-Api-Key,"
+        "X-Amz-Security-Token,Sec-Ch-Ua,Sec-Ch-Ua-Mobile,Sec-Ch-Ua-Platform,Dnt"
+    ),
+    "Access-Control-Max-Age": "3600",
+    "Content-Type": "application/json",
+}
 
 
-def scan_url(url, checks):
-    """
-    Performs security checks on the target URL.
-    """
-    results = []
+def respond(status_code, body):
+    return {
+        "statusCode": status_code,
+        "headers": CORS_HEADERS,
+        "body": json.dumps(body),
+    }
 
-    # 1. Standardize URL and perform initial connection check
+
+def scan_url(url: str, checks: list[str]) -> list[dict]:
     if not url.startswith(("http://", "https://")):
         url = "https://" + url
+    parsed = urlparse(url)
+    if not parsed.netloc:
+        return [
+            {"url": url, "error_message": "Invalid domain", "security_findings": {}}
+        ]
 
-    status_code = None
-    error_message = None
-    headers = {}
-    http_status = "FAILED"
-
-    try:
-        # Use a timeout for resilience
-        response = requests.get(url, timeout=10)
-        status_code = response.status_code
-        headers = response.headers
-
-        if 200 <= status_code < 400:
-            http_status = "PASSED"
-        elif 400 <= status_code < 500:
-            http_status = "WARNING"
-        else:
-            http_status = "FAILED"  # 5xx or other non-client errors
-
-    except requests.exceptions.RequestException as e:
-        error_message = str(e)
-        http_status = "FAILED"
-        # Return early if connection fails
-        return {
-            "url": url,
-            "status_code": status_code if status_code else 0,
-            "http_status": http_status,
-            "error_message": error_message,
-            "security_findings": {},
-        }
-
-    # 2. Perform Security Checks
-    security_findings = {}
-
-    if "Strict-Transport-Security" in checks:
-        hsts_value = headers.get("Strict-Transport-Security")
-        if hsts_value:
-            # Check for max-age and includeSubDomains
-            if "max-age=" in hsts_value and "includeSubDomains" in hsts_value:
-                hsts_status = "PASSED"
-                hsts_notes = "HSTS header is present and correctly includes max-age and includeSubDomains."
-            else:
-                hsts_status = "WARNING"
-                hsts_notes = "HSTS header is present but may be missing max-age or includeSubDomains."
-
-            security_findings["hsts_status"] = hsts_status
-            security_findings["hsts_value"] = hsts_value
-            security_findings["hsts_notes"] = hsts_notes
-        else:
-            security_findings["hsts_status"] = "FAILED"
-            security_findings["hsts_notes"] = (
-                "Strict-Transport-Security (HSTS) header is missing."
-            )
-
-    if "X-Frame-Options" in checks:
-        xfo_value = headers.get("X-Frame-Options")
-        if xfo_value:
-            xfo_value = xfo_value.upper()
-            if xfo_value in ["DENY", "SAMEORIGIN"]:
-                xfo_status = "PASSED"
-                xfo_notes = f"X-Frame-Options is set to {xfo_value}."
-            else:
-                xfo_status = "WARNING"
-                xfo_notes = f"X-Frame-Options is present but set to an unusual value: {xfo_value}."
-
-            security_findings["xfo_status"] = xfo_status
-            security_findings["xfo_value"] = xfo_value
-            security_findings["xfo_notes"] = xfo_notes
-        else:
-            security_findings["xfo_status"] = "FAILED"
-            security_findings["xfo_notes"] = "X-Frame-Options (XFO) header is missing."
-
-    # 3. Compile the single result object
-    results.append(
-        {
-            "url": url,
-            "status_code": status_code if status_code else 0,
-            "http_status": http_status,
-            "error_message": error_message,
-            "security_findings": security_findings,
-        }
+    cleaned = urlunparse(
+        ("https", parsed.netloc.split(":")[0], parsed.path or "/", "", "", "")
     )
 
-    return results
-
-
-def handler(event, context):
-    """
-    Handles the API Gateway request.
-    This function is now named 'handler' to match the standard configuration.
-    """
-
-    # 1. Parse the request body (comes as a JSON string in the event body)
     try:
-        # Note: API Gateway sends headers in 'headers', and body as a string.
-        body = json.loads(event.get("body", "{}"))
-        target_url = body.get("url", "").strip()
-        checks_list = body.get("checks", [])
+        resp = requests.get(cleaned, timeout=10)
+    except requests.exceptions.RequestException as e:
+        return [{"url": cleaned, "error_message": str(e), "security_findings": {}}]
 
-        # CORS Headers for all responses (moved here for clarity)
-        cors_headers = {
-            "Access-Control-Allow-Origin": "*",
-            "Content-Type": "application/json",
-        }
+    headers = resp.headers
+    findings = {}
 
-        if not target_url:
-            return {
-                "statusCode": 400,
-                "headers": cors_headers,
-                "body": json.dumps({"error": "Missing target URL in request body."}),
-            }
-
-    except json.JSONDecodeError:
+    def check_header(name, condition, pass_note, fail_note):
+        value = headers.get(name)
+        if not value:
+            return {"status": "FAILED", "value": None, "notes": fail_note}
         return {
-            "statusCode": 400,
-            "headers": cors_headers,
-            "body": json.dumps({"error": "Invalid JSON format in request body."}),
+            "status": "PASSED" if condition(value) else "WARNING",
+            "value": value,
+            "notes": pass_note,
         }
 
-    # 2. Run the scan
-    scan_results = scan_url(target_url, checks_list)
+    for header_name, condition, pass_note, fail_note in [
+        (
+            "Strict-Transport-Security",
+            lambda v: "max-age" in v and "includeSubDomains" in v,
+            "HSTS configured properly.",
+            "Missing or incomplete HSTS header.",
+        ),
+        (
+            "X-Frame-Options",
+            lambda v: v.upper() in ["DENY", "SAMEORIGIN"],
+            "Proper X-Frame-Options value.",
+            "Missing or unsafe X-Frame-Options.",
+        ),
+        (
+            "X-Content-Type-Options",
+            lambda v: v.lower() == "nosniff",
+            "Prevents MIME-type sniffing.",
+            "Missing or invalid X-Content-Type-Options.",
+        ),
+        (
+            "Content-Security-Policy",
+            lambda v: bool(v.strip()),
+            "CSP present.",
+            "Missing Content-Security-Policy.",
+        ),
+        (
+            "Referrer-Policy",
+            lambda v: v
+            in [
+                "no-referrer",
+                "same-origin",
+                "strict-origin",
+                "strict-origin-when-cross-origin",
+            ],
+            "Valid Referrer-Policy.",
+            "Missing or weak Referrer-Policy.",
+        ),
+        (
+            "Permissions-Policy",
+            lambda v: bool(v.strip()),
+            "Permissions-Policy header present.",
+            "Missing Permissions-Policy.",
+        ),
+    ]:
+        if header_name in checks:
+            findings[header_name] = check_header(
+                header_name, condition, pass_note, fail_note
+            )
 
-    # 3. Construct the final response with required CORS headers
-    return {
-        "statusCode": 200,
-        "headers": cors_headers,
-        "body": json.dumps({"results": scan_results}),
-    }
+    for header, expected in {
+        "Cross-Origin-Opener-Policy": "same-origin",
+        "Cross-Origin-Resource-Policy": "same-origin",
+        "Cross-Origin-Embedder-Policy": "require-corp",
+    }.items():
+        if header in checks:
+            findings[header] = check_header(
+                header,
+                lambda v: v.lower() == expected,
+                f"{header} correctly set.",
+                f"Missing or incorrect {header}.",
+            )
+
+    return [
+        {
+            "url": cleaned,
+            "status_code": resp.status_code,
+            "security_findings": findings,
+            "full_headers": dict(headers),
+        }
+    ]
+
+
+def lambda_handler(event, context):
+    if event.get("httpMethod") == "OPTIONS":
+        return respond(200, {"message": "CORS preflight OK"})
+
+    try:
+        try:
+            body = json.loads(event.get("body") or "{}")
+        except json.JSONDecodeError:
+            return respond(400, {"error": "Invalid JSON in request body"})
+
+        url = body.get("url")
+        checks = body.get("checks", [])
+
+        if not url:
+            return respond(400, {"error": "Missing URL in request body"})
+
+        try:
+            results = scan_url(url, checks)
+        except Exception as e:
+            logger.error(f"Scan failed: {e}", exc_info=True)
+            results = [
+                {
+                    "url": url,
+                    "error_message": f"Scan failed: {str(e)}",
+                    "security_findings": {},
+                }
+            ]
+
+        return respond(200, {"results": results})
+
+    except Exception as e:
+        logger.error(f"Unexpected error: {e}", exc_info=True)
+        return respond(500, {"error": f"Internal server error: {str(e)}"})

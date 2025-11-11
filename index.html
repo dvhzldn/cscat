@@ -3,11 +3,18 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>CSCAT On-Demand Security Scanner</title>
+    <title>HTTP Security Headers & DNS Check</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
       html {
         font-family: "Inter", sans-serif;
+      }
+      pre::-webkit-scrollbar {
+        height: 6px;
+      }
+      pre::-webkit-scrollbar-thumb {
+        background-color: #a5b4fc;
+        border-radius: 3px;
       }
     </style>
   </head>
@@ -16,86 +23,276 @@
       class="max-w-4xl mx-auto bg-white shadow-xl rounded-xl p-6 sm:p-10 border border-gray-100"
     >
       <h1 class="text-3xl sm:text-4xl font-extrabold text-indigo-800 mb-2">
-        CSCAT On-Demand Scan
+        HTTP Security Headers & DNS Check
       </h1>
       <p class="text-gray-600 mb-8">
-        Test any public URL for critical security headers instantly.
+        Verify domain security headers and email protection protocols.
       </p>
 
       <form id="scanForm" class="space-y-6">
-        <div class="hidden">
-          <input
-            type="text"
-            id="apiUrl"
-            value="[PASTE YOUR API GATEWAY URL HERE]"
-            placeholder="Paste your API Gateway URL here"
-          />
-        </div>
+        <input
+          type="hidden"
+          id="apiUrl"
+          value="[PASTE YOUR API GATEWAY URL HERE]"
+        />
 
         <div>
           <label
             for="targetUrl"
             class="block text-sm font-medium text-gray-700 mb-1"
-            >Target URL (e.g., example.com or https://example.com)</label
+            >Input target URL</label
           >
           <input
             type="url"
             id="targetUrl"
             required
-            placeholder="Enter the full URL or domain name"
-            class="w-full px-4 py-3 border border-indigo-300 rounded-lg shadow-md focus:ring-indigo-500 focus:border-indigo-500 transition duration-150"
+            placeholder="https://example.com"
+            class="w-full px-4 py-3 border border-indigo-300 rounded-lg shadow-md focus:ring-indigo-500 focus:border-indigo-500"
           />
         </div>
 
         <div>
-          <span class="block text-sm font-medium text-gray-700 mb-3"
-            >Security Checks to Perform:</span
+          <button
+            type="button"
+            id="toggleChecksBtn"
+            class="w-full flex items-center justify-between px-4 py-3 text-base font-medium rounded-lg shadow-sm text-indigo-700 bg-indigo-50 hover:bg-indigo-100 focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
+            aria-expanded="false"
+            aria-controls="checksContainer"
           >
-          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <label
-              class="flex items-center p-3 bg-gray-50 rounded-lg border border-gray-200 cursor-pointer hover:bg-indigo-50 transition duration-150"
-            >
-              <input
-                type="checkbox"
-                name="checks"
-                value="Strict-Transport-Security"
-                checked
-                class="h-5 w-5 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
-              />
-              <span class="ml-3 text-sm font-medium text-gray-800"
-                >Strict-Transport-Security (HSTS)</span
+            <span class="font-semibold">Security Checks</span>
+            <span class="flex items-center text-sm">
+              Expand to customise
+              <svg
+                id="toggleIcon"
+                class="w-4 h-4 ml-2 transform transition-transform duration-300"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+                xmlns="http://www.w3.org/2000/svg"
+                role="img"
+                aria-hidden="true"
+                focusable="false"
               >
-            </label>
+                <path
+                  stroke-linecap="round"
+                  stroke-linejoin="round"
+                  stroke-width="2"
+                  d="M19 9l-7 7-7-7"
+                ></path>
+              </svg>
+            </span>
+          </button>
 
-            <label
-              class="flex items-center p-3 bg-gray-50 rounded-lg border border-gray-200 cursor-pointer hover:bg-indigo-50 transition duration-150"
+          <div id="checksContainer" class="mt-4 hidden">
+            <span
+              id="checks-group-label"
+              class="block text-sm font-medium text-gray-700 mb-3"
+              >Select checks:</span
             >
-              <input
-                type="checkbox"
-                name="checks"
-                value="X-Frame-Options"
-                checked
-                class="h-5 w-5 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
-              />
-              <span class="ml-3 text-sm font-medium text-gray-800"
-                >X-Frame-Options (XFO)</span
+            <div
+              class="grid grid-cols-1 sm:grid-cols-2 gap-4"
+              role="group"
+              aria-labelledby="checks-group-label"
+            >
+              <label
+                class="flex items-center p-3 bg-gray-50 rounded-lg border border-gray-200 cursor-pointer hover:bg-indigo-50"
+                title="HSTS: Forces modern browsers to only connect via HTTPS, preventing downgrade attacks."
               >
-            </label>
+                <input
+                  type="checkbox"
+                  name="checks"
+                  value="Strict-Transport-Security"
+                  checked
+                  class="h-5 w-5 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                />
+                <span class="ml-3 text-sm font-medium text-gray-800"
+                  >Strict-Transport-Security (HSTS)</span
+                >
+              </label>
+              <label
+                class="flex items-center p-3 bg-gray-50 rounded-lg border border-gray-200 cursor-pointer hover:bg-indigo-50"
+                title="XFO: Prevents clickjacking by controlling if the page can be loaded in an iframe."
+              >
+                <input
+                  type="checkbox"
+                  name="checks"
+                  value="X-Frame-Options"
+                  checked
+                  class="h-5 w-5 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                />
+                <span class="ml-3 text-sm font-medium text-gray-800"
+                  >X-Frame-Options (XFO)</span
+                >
+              </label>
+              <label
+                class="flex items-center p-3 bg-gray-50 rounded-lg border border-gray-200 cursor-pointer hover:bg-indigo-50"
+                title="NoSniff: Prevents the browser from MIME-type sniffing, mitigating script injection risks."
+              >
+                <input
+                  type="checkbox"
+                  name="checks"
+                  value="X-Content-Type-Options"
+                  checked
+                  class="h-5 w-5 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                />
+                <span class="ml-3 text-sm font-medium text-gray-800"
+                  >X-Content-Type-Options</span
+                >
+              </label>
+              <label
+                class="flex items-center p-3 bg-gray-50 rounded-lg border border-gray-200 cursor-pointer hover:bg-indigo-50"
+                title="CSP: The primary defense against XSS, allowing control over content sources (scripts, styles, etc.)."
+              >
+                <input
+                  type="checkbox"
+                  name="checks"
+                  value="Content-Security-Policy"
+                  checked
+                  class="h-5 w-5 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                />
+                <span class="ml-3 text-sm font-medium text-gray-800"
+                  >Content-Security-Policy (CSP)</span
+                >
+              </label>
+              <label
+                class="flex items-center p-3 bg-gray-50 rounded-lg border border-gray-200 cursor-pointer hover:bg-indigo-50"
+                title="Controls how much referrer information is sent when navigating off-site."
+              >
+                <input
+                  type="checkbox"
+                  name="checks"
+                  value="Referrer-Policy"
+                  checked
+                  class="h-5 w-5 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                />
+                <span class="ml-3 text-sm font-medium text-gray-800"
+                  >Referrer-Policy</span
+                >
+              </label>
+              <label
+                class="flex items-center p-3 bg-gray-50 rounded-lg border border-gray-200 cursor-pointer hover:bg-indigo-50"
+                title="Controls browser features (such as camera, geolocation etc.) available to the page and its iframes."
+              >
+                <input
+                  type="checkbox"
+                  name="checks"
+                  value="Permissions-Policy"
+                  checked
+                  class="h-5 w-5 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                />
+                <span class="ml-3 text-sm font-medium text-gray-800"
+                  >Permissions-Policy</span
+                >
+              </label>
+              <label
+                class="flex items-center p-3 bg-gray-50 rounded-lg border border-gray-200 cursor-pointer hover:bg-indigo-50"
+                title="CORP: Prevents others from embedding your resources cross-origin, mitigating data theft."
+              >
+                <input
+                  type="checkbox"
+                  name="checks"
+                  value="Cross-Origin-Resource-Policy"
+                  checked
+                  class="h-5 w-5 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                />
+                <span class="ml-3 text-sm font-medium text-gray-800"
+                  >Cross-Origin-Resource-Policy</span
+                >
+              </label>
+              <label
+                class="flex items-center p-3 bg-gray-50 rounded-lg border border-gray-200 cursor-pointer hover:bg-indigo-50"
+                title="COOP: Isolates the document from cross-origin windows to prevent specific attacks."
+              >
+                <input
+                  type="checkbox"
+                  name="checks"
+                  value="Cross-Origin-Opener-Policy"
+                  checked
+                  class="h-5 w-5 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                />
+                <span class="ml-3 text-sm font-medium text-gray-800"
+                  >Cross-Origin-Opener-Policy</span
+                >
+              </label>
+              <label
+                class="flex items-center p-3 bg-gray-50 rounded-lg border border-gray-200 cursor-pointer hover:bg-indigo-50"
+                title="Reveals web server software (such as Nginx, Apache etc.). Recommended to hide this in production."
+              >
+                <input
+                  type="checkbox"
+                  name="checks"
+                  value="Server"
+                  checked
+                  class="h-5 w-5 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                />
+                <span class="ml-3 text-sm font-medium text-gray-800"
+                  >Server Header Check</span
+                >
+              </label>
+              <label
+                class="flex items-center p-3 bg-gray-50 rounded-lg border border-gray-200 cursor-pointer hover:bg-indigo-50"
+                title="Reveals backend languages/frameworks (PHP, ASP.NET etc.). Recommended to suppress this."
+              >
+                <input
+                  type="checkbox"
+                  name="checks"
+                  value="X_Powered_By"
+                  checked
+                  class="h-5 w-5 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                />
+                <span class="ml-3 text-sm font-medium text-gray-800"
+                  >X-Powered-By Check</span
+                >
+              </label>
+              <label
+                class="flex items-center p-3 bg-gray-50 rounded-lg border border-gray-200 cursor-pointer hover:bg-indigo-50"
+                title="Run all DNS checks: SPF, DMARC, DKIM, and DNSSEC."
+              >
+                <input
+                  type="checkbox"
+                  name="checks"
+                  value="DNS_GROUP"
+                  checked
+                  class="h-5 w-5 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                />
+                <span class="ml-3 text-sm font-medium text-gray-800"
+                  >DNS & Email security</span
+                >
+              </label>
+              <label
+                class="flex items-center p-3 bg-gray-50 rounded-lg border border-gray-200 cursor-pointer hover:bg-indigo-50"
+                title="Attempts to identify the broader technology stack (CMS, Frameworks, Libraries)."
+              >
+                <input
+                  type="checkbox"
+                  name="checks"
+                  value="Technology_Stack"
+                  checked
+                  class="h-5 w-5 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                />
+                <span class="ml-3 text-sm font-medium text-gray-800"
+                  >Technology Stack Fingerprint</span
+                >
+              </label>
+            </div>
           </div>
         </div>
 
         <button
           type="submit"
           id="scanButton"
-          class="w-full flex items-center justify-center px-6 py-3 border border-transparent text-base font-medium rounded-lg shadow-lg text-white bg-indigo-600 hover:bg-indigo-700 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500 transition duration-150 transform active:scale-95 disabled:bg-indigo-400"
+          class="w-full flex items-center justify-center px-6 py-3 text-base font-medium rounded-lg shadow-lg text-white bg-indigo-600 hover:bg-indigo-700 focus:ring-2 focus:ring-offset-2 focus:ring-indigo-500"
         >
           <svg
             id="scanIcon"
             class="w-5 h-5 mr-3"
             fill="currentColor"
             viewBox="0 0 20 20"
-            xmlns="http://www.w3.org/2000/svg"
+            role="img"
+            aria-hidden="true"
+            focusable="false"
           >
+            <title>Scan Icon</title>
             <path
               fill-rule="evenodd"
               d="M8 4a4 4 0 100 8 4 4 0 000-8zM2 8a6 6 0 1110.89 3.476l4.817 4.817a1 1 0 01-1.414 1.414l-4.816-4.816A6 6 0 012 8z"
@@ -108,7 +305,11 @@
             xmlns="http://www.w3.org/2000/svg"
             fill="none"
             viewBox="0 0 24 24"
+            role="status"
+            aria-hidden="true"
+            focusable="false"
           >
+            <title>Loading spinner</title>
             <circle
               class="opacity-25"
               cx="12"
@@ -123,261 +324,625 @@
               d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"
             ></path>
           </svg>
-          <span id="buttonText">Run On-Demand Scan</span>
+          <span id="buttonText">Scan now</span>
         </button>
       </form>
-
-      <div
-        id="resultsContainer"
-        class="mt-10 pt-6 border-t border-gray-200 hidden"
-      >
-        <h2 class="text-2xl font-bold text-gray-800 mb-4">Scan Results</h2>
-        <div id="resultsContent" class="space-y-4"></div>
-        <div
-          class="mt-6 p-4 bg-yellow-50 text-yellow-800 rounded-lg text-sm font-medium border border-yellow-200"
-        >
-          Note: This result is returned directly by the Lambda function and is
-          not stored in S3.
-        </div>
-      </div>
-
       <div
         id="messageBox"
         class="mt-4 p-4 text-sm rounded-lg border hidden"
         role="alert"
+        aria-live="assertive"
       ></div>
+      <div
+        id="resultsContainer"
+        class="mt-10 pt-6 border-t border-gray-200 hidden"
+        aria-live="polite"
+      >
+        <div class="flex items-center justify-between mb-4">
+          <h2
+            class="text-2xl font-bold text-gray-800"
+            id="scan-results-heading"
+          >
+            Scan Results
+          </h2>
+          <button
+            id="exportBtn"
+            class="px-3 py-1 text-sm bg-black text-white font-medium rounded hover:bg-gray-800 hidden"
+            aria-describedby="scan-results-heading"
+          >
+            Export JSON
+          </button>
+        </div>
+        <div
+          id="resultsContent"
+          class="space-y-4"
+          aria-labelledby="scan-results-heading"
+        ></div>
+
+        <div class="mt-8">
+          <h2
+            class="text-2xl font-bold text-gray-800 border-t pt-4 border-gray-200"
+            id="fingerprint-results-heading"
+          >
+            Application Infrastructure
+          </h2>
+          <div
+            id="fingerprintResultsContent"
+            class="space-y-4 mt-4"
+            aria-labelledby="fingerprint-results-heading"
+          ></div>
+        </div>
+
+        <div class="mt-8">
+          <h2
+            class="text-2xl font-bold text-gray-800 border-t pt-4 border-gray-200"
+            id="dns-results-heading"
+          >
+            Email & DNS Security
+          </h2>
+          <div
+            id="dnsResultsContent"
+            class="space-y-4 mt-4"
+            aria-labelledby="dns-results-heading"
+          ></div>
+        </div>
+        <div id="fullHeadersContainer" class="mt-4">
+          <button
+            id="toggleHeadersBtn"
+            class="w-full text-left text-lg font-semibold text-gray-700 mb-2 cursor-pointer flex items-center justify-between"
+            aria-expanded="false"
+            aria-controls="fullHeadersOutput"
+          >
+            Full HTTP Response Headers
+            <svg
+              class="w-4 h-4 text-gray-500 transform transition duration-200"
+              id="headerToggleIcon"
+              viewBox="0 0 20 20"
+              fill="currentColor"
+              role="img"
+              aria-hidden="true"
+              focusable="false"
+            >
+              <title>Toggle Headers</title>
+              <path
+                fill-rule="evenodd"
+                d="M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z"
+                clip-rule="evenodd"
+              />
+            </svg>
+          </button>
+          <pre
+            id="fullHeadersOutput"
+            class="bg-gray-900 text-yellow-100 text-sm p-3 rounded-lg overflow-x-auto hidden"
+          ></pre>
+        </div>
+      </div>
     </div>
 
     <script>
-      const API_BASE_URL = document.getElementById("apiUrl").value;
+      const CHECK_DETAILS = {
+        "Strict-Transport-Security": {
+          title: "Strict-Transport-Security (HSTS)",
+          description:
+            "HSTS forces modern web browsers to use secure HTTPS connections exclusively, which prevents protocol downgrade attacks and cookie hijacking.",
+          passed:
+            "The header is present and configured correctly. Users are protected against protocol downgrade attacks.",
+          failed:
+            "Missing or misconfigured. The site is vulnerable to protocol downgrade attacks when first accessed over an insecure HTTP connection.",
+        },
+        "X-Frame-Options": {
+          title: "X-Frame-Options (XFO)",
+          description:
+            "XFO prevents clickjacking attacks by controlling whether the web page can be embedded (loaded) inside a frame, such as an iframe.",
+          passed:
+            "Set to `SAMEORIGIN` or `DENY`. The site's content cannot be maliciously framed by other websites.",
+          failed:
+            "Missing. The site is vulnerable to clickjacking attacks, where an attacker loads the site in an invisible frame to trick users.",
+        },
+        "X-Content-Type-Options": {
+          title: "X-Content-Type-Options (NoSniff)",
+          description:
+            "This prevents the browser from guessing (sniffing) a file's type. This stops certain script execution attacks if a user can upload unvalidated files.",
+          passed:
+            "Set to `nosniff`. Prevents the browser from executing files based on content instead of the declared file type.",
+          failed:
+            "Missing. Allows the browser to perform content-sniffing, which can be exploited to execute malicious files disguised as safe types.",
+        },
+        "Content-Security-Policy": {
+          title: "Content-Security-Policy (CSP)",
+          description:
+            "The best defense against Cross-Site Scripting (XSS). CSP defines approved sources of content, which prevents unauthorised code injection.",
+          passed:
+            "Header found. The policy should be reviewed for effectiveness (such as restricted sources for scripts and objects).",
+          failed:
+            "Missing. The site relies solely on the browser's default XSS defense, making it highly vulnerable to injection attacks.",
+        },
+        "Referrer-Policy": {
+          title: "Referrer-Policy",
+          description:
+            "Controls how much referrer information (the URL the user came from) is sent when navigating off the site, protecting user privacy.",
+          passed:
+            "Policy set to a secure level, which limits data leakage to third parties.",
+          failed:
+            "Policy is missing or set to an insecure level, which can leak private URLs to third-party sites.",
+        },
+        "Permissions-Policy": {
+          title: "Permissions-Policy",
+          description:
+            "Allows or denies the use of sensitive browser features (such as camera, microphone, geolocation etc.) for the current document or any embedded iframes.",
+          passed:
+            "Policy present. Browser features are explicitly controlled or disabled where unnecessary.",
+          failed:
+            "Missing. This allows embedded third-party content to use sensitive browser features without explicit control.",
+        },
+        "Cross-Origin-Opener-Policy": {
+          title: "Cross-Origin-Opener-Policy (COOP)",
+          description:
+            "Isolates the document from cross-origin windows, which mitigates Spectre-like attacks and protects the global object.",
+          passed:
+            "Policy set to `same-origin` or similar. The document is safely isolated.",
+          failed:
+            "Missing. The document can be referenced by cross-origin pop-up windows, making it vulnerable to certain information disclosure attacks.",
+        },
+        "Cross-Origin-Resource-Policy": {
+          title: "Cross-Origin-Resource-Policy (CORP)",
+          description:
+            "Prevents other origins from embedding the site's resources, which mitigates data theft via side-channel attacks like Spectre.",
+          passed:
+            "Policy set to `same-origin` or `same-site`. Resources are protected from unauthorised embedding.",
+          failed:
+            "Missing. Allows any third-party website to embed the site's resources, potentially leading to data theft via side-channel attacks.",
+        },
 
+        SPF: {
+          title: "SPF (Sender Policy Framework)",
+          description:
+            "Specifies which mail servers are authori**s**ed to send email on behalf of the domain, which prevents email spoofing.",
+          passed:
+            "SPF record found. Authorised mail servers are clearly defined.",
+          failed:
+            "No valid SPF record found. The domain is easily spoofable by unauthori**s**ed third parties for phishing attacks.",
+          warning:
+            "Multiple SPF records found (RFC violation) or missing a proper fail mechanism.",
+        },
+        DMARC: {
+          title: "DMARC (Domain-based Message Authentication)",
+          description:
+            "Tells receiving mail servers what to do with email that fails SPF or DKIM checks (monitor, quarantine, or reject).",
+          passed:
+            "DMARC record found with a strong policy of 'quarantine' or 'reject', providing good protection.",
+          warning:
+            "Policy is set to 'none' (monitoring only). It is recommended to strengthen the policy to 'quarantine' or 'reject'.",
+          failed:
+            "No DMARC record found. Failed emails are treated inconsistently, which reduces phishing protection.",
+        },
+        DKIM: {
+          title: "DKIM (DomainKeys Identified Mail)",
+          description:
+            "Uses cryptographic signatures to verify that an email was not tampered with while it was being sent.",
+          passed:
+            "Common DKIM selector found. Emails from the domain are cryptographically signed, increasing delivery trust.",
+          failed:
+            "Common selector not found. Lack of DKIM can negatively affect email deliverability and makes emails less trustworthy.",
+        },
+        DNSSEC: {
+          title: "DNSSEC (DNS Security Extensions)",
+          description:
+            "Digitally signs DNS records to ensure that the user's connection to the site is not redirected by a malicious server (DNS spoofing).",
+          passed:
+            "DS record found. The domain's DNS records are protected against cache poisoning.",
+          failed:
+            "No DS record found. The domain is vulnerable to DNS cache poisoning/spoofing, which could redirect traffic to an attacker's site.",
+        },
+        Server: {
+          title: "Web Server Identification",
+          description:
+            "Identifies the web server software. If this is exposed, it may reveal specific vulnerabilities.",
+          passed:
+            "The Server header is either missing or reports non-specific information.",
+          failed:
+            "The Server header explicitly reveals the software and version, which is a common information leak.",
+        },
+        X_Powered_By: {
+          title: "X-Powered-By Header",
+          description:
+            "This header often reveals the programming language or framework used, which should be suppressed in production.",
+          passed:
+            "The X-Powered-By header is not present, limiting information disclosure.",
+          failed:
+            "The header is present and reveals internal technology details.",
+        },
+        Technology_Stack: {
+          title: "Detected Technology Stack",
+          description:
+            "A comprehensive attempt to identify frameworks, CMS and analytics tools from headers and script tags.",
+          passed:
+            "No sensitive or specific technologies easily identified by standard scanning techniques.",
+          warning:
+            "A technology stack was identified. Ensure it is up-to-date.",
+          failed:
+            "Multiple outdated or known vulnerable technologies were easily identified.",
+        },
+      };
+
+      const API_BASE_URL = document.getElementById("apiUrl").value;
       const form = document.getElementById("scanForm");
       const resultsContainer = document.getElementById("resultsContainer");
       const resultsContent = document.getElementById("resultsContent");
+      const dnsResultsContent = document.getElementById("dnsResultsContent");
+      const fingerprintResultsContent = document.getElementById(
+        "fingerprintResultsContent"
+      );
+      const fullHeadersOutput = document.getElementById("fullHeadersOutput");
+      const exportBtn = document.getElementById("exportBtn");
       const messageBox = document.getElementById("messageBox");
       const scanButton = document.getElementById("scanButton");
       const loadingSpinner = document.getElementById("loadingSpinner");
       const scanIcon = document.getElementById("scanIcon");
       const buttonText = document.getElementById("buttonText");
+      const toggleChecksBtn = document.getElementById("toggleChecksBtn");
+      const checksContainer = document.getElementById("checksContainer");
+      const toggleIcon = document.getElementById("toggleIcon");
+      const toggleHeadersBtn = document.getElementById("toggleHeadersBtn");
 
-      /**
-       * Helper to show messages (success/error)
-       */
+      const HTTP_SCAN_KEYS = [
+        "Strict-Transport-Security",
+        "X-Frame-Options",
+        "X-Content-Type-Options",
+        "Content-Security-Policy",
+        "Referrer-Policy",
+        "Permissions-Policy",
+        "Cross-Origin-Opener-Policy",
+        "Cross-Origin-Resource-Policy",
+        "Server",
+        "X_Powered_By",
+      ];
+      const FINGERPRINT_KEYS = ["Server", "X_Powered_By", "Technology_Stack"];
+      const DNS_KEYS = ["SPF", "DMARC", "DKIM", "DNSSEC"];
+
+      if (toggleHeadersBtn) {
+        toggleHeadersBtn.addEventListener("click", () => {
+          const isHidden = fullHeadersOutput.classList.toggle("hidden");
+          toggleHeadersBtn.setAttribute(
+            "aria-expanded",
+            isHidden ? "false" : "true"
+          );
+          toggleIcon.classList.toggle("rotate-180", !isHidden);
+        });
+      }
+
       function showMessage(message, type = "error") {
         messageBox.textContent = message;
-        messageBox.classList.remove(
-          "hidden",
-          "bg-red-100",
-          "border-red-400",
-          "text-red-700",
-          "bg-green-100",
-          "border-green-400",
-          "text-green-700"
-        );
-
-        if (type === "success") {
-          messageBox.classList.add(
-            "bg-green-100",
-            "border-green-400",
-            "text-green-700"
-          );
-        } else {
-          messageBox.classList.add(
-            "bg-red-100",
-            "border-red-400",
-            "text-red-700"
-          );
-        }
-        messageBox.scrollIntoView({ behavior: "smooth" });
+        messageBox.className = `mt-4 p-4 text-sm rounded-lg border ${
+          type === "success"
+            ? "bg-green-100 border-green-400 text-green-700"
+            : "bg-red-100 border-red-400 text-red-700"
+        }`;
+        messageBox.classList.remove("hidden");
       }
 
-      /**
-       * Toggles the loading state of the button
-       */
       function toggleLoading(isLoading) {
         scanButton.disabled = isLoading;
-        if (isLoading) {
-          loadingSpinner.classList.remove("hidden");
-          scanIcon.classList.add("hidden");
-          buttonText.textContent = "Scanning...";
-        } else {
-          loadingSpinner.classList.add("hidden");
-          scanIcon.classList.remove("hidden");
-          buttonText.textContent = "Run On-Demand Scan";
-        }
+        loadingSpinner.classList.toggle("hidden", !isLoading);
+        scanIcon.classList.toggle("hidden", isLoading);
+        buttonText.textContent = isLoading ? "Scanning..." : "Run a scan";
       }
-
-      /**
-       * Renders the findings dynamically
-       */
-      function renderFindings(findings) {
-        resultsContent.innerHTML = "";
-
-        const createFindingCard = (title, status, value, notes) => {
-          let colorClass, statusText;
-
-          switch (status) {
-            case "PASSED":
-              colorClass = "bg-green-50 border-green-400 text-green-700";
-              statusText = "PASSED";
-              break;
-            case "WARNING":
-              colorClass = "bg-yellow-50 border-yellow-400 text-yellow-700";
-              statusText = "WARNING";
-              break;
-            case "FAILED":
-            default:
-              colorClass = "bg-red-50 border-red-400 text-red-700";
-              statusText = "FAILED";
-              break;
-          }
-
-          const card = document.createElement("div");
-          card.className = `p-4 border-l-4 rounded-lg shadow-sm ${colorClass}`;
-          card.innerHTML = `
-                    <h3 class="text-lg font-semibold mb-1">${title}</h3>
-                    <div class="flex justify-between items-center mb-2">
-                        <span class="font-bold text-sm">Status:</span>
-                        <span class="px-2 py-0.5 rounded-full text-xs font-bold ${
-                          status === "PASSED"
-                            ? "bg-green-500 text-white"
-                            : status === "WARNING"
-                            ? "bg-yellow-500 text-white"
-                            : "bg-red-500 text-white"
-                        }">${statusText}</span>
-                    </div>
-                    ${
-                      value
-                        ? `<p class="text-xs font-mono break-all mt-2 bg-white p-2 rounded">${value}</p>`
-                        : ""
-                    }
-                    ${
-                      notes ? `<p class="text-sm italic mt-2">${notes}</p>` : ""
-                    }
-                `;
-          return card;
+      function createCard(checkKey, status, value, notes) {
+        const details = CHECK_DETAILS[checkKey] || {
+          title: checkKey,
+          description: "Standard check.",
+          passed: "Check passed successfully.",
+          failed: "Check failed.",
+          warning: "Check passed with a warning.",
         };
 
-        const secFindings = findings.security_findings || {};
+        let color = "gray";
+        let statusMessage = "";
 
-        let html = "";
-
-        // Render HTTP Status Card
-        const httpStatus = findings.http_status;
-        const httpColor =
-          httpStatus === "PASSED"
-            ? "bg-indigo-50 text-indigo-800 border-indigo-500"
-            : "bg-red-50 text-red-800 border-red-500";
-
-        html += `<div class="p-4 rounded-lg border-l-4 ${httpColor}">
-                        <h3 class="text-lg font-semibold mb-1">HTTP Connection Status</h3>
-                        <p class="font-bold text-xl">${
-                          findings.status_code
-                        } - ${httpStatus}</p>
-                        ${
-                          findings.error_message
-                            ? `<p class="text-sm text-red-600 mt-2">Error: ${findings.error_message}</p>`
-                            : ""
-                        }
-                    </div>`;
-
-        // Render HSTS
-        if (secFindings.hsts_status) {
-          resultsContent.appendChild(
-            createFindingCard(
-              "Strict-Transport-Security (HSTS)",
-              secFindings.hsts_status,
-              secFindings.hsts_value,
-              secFindings.hsts_notes
-            )
-          );
+        if (status === "PASSED") {
+          color = "green";
+          statusMessage = details.passed;
+        } else if (status === "WARNING") {
+          color = "yellow";
+          statusMessage = details.warning || details.passed;
+        } else if (status === "FAILED") {
+          color = "red";
+          statusMessage = details.failed;
+        } else if (status === "ERROR") {
+          color = "red";
+          statusMessage = `An unexpected error occurred during the check: ${notes}`;
+        } else if (status === "CHECK") {
+          color = "indigo";
+          statusMessage = notes || "Check executed.";
+        } else {
+          color = "gray";
+          statusMessage = notes || "Status not determined.";
         }
 
-        // Render XFO
-        if (secFindings.xfo_status) {
+        const card = document.createElement("div");
+        card.className = `p-5 border-l-4 rounded-lg shadow-md bg-${color}-50 border-${color}-400`;
+        card.innerHTML = `
+            <div class="flex justify-between items-start mb-2">
+                <h3 class="text-xl font-bold text-${color}-800">${
+          details.title
+        }</h3>
+                <span class="px-3 py-1 rounded-full text-xs font-bold bg-${color}-500 text-white">${status}</span>
+            </div>
+
+            <p class="text-sm text-gray-700 mb-3 italic">${
+              details.description
+            }</p>
+
+            <div class="mt-3 p-3 rounded bg-white border border-gray-200">
+                <p class="text-sm font-semibold text-gray-800 mb-1">Implication:</p>
+                <p class="text-sm text-${color}-700">${statusMessage}</p>
+            </div>
+
+            ${
+              value
+                ? `<div class="mt-3">
+                    <p class="text-sm font-semibold text-gray-800 mb-1">Value Found:</p>
+                    <p class="text-xs font-mono break-all bg-gray-100 p-2 rounded">${value}</p>
+                    </div>`
+                : ""
+            }
+        `;
+        return card;
+      }
+
+      function renderFindings(result) {
+        resultsContent.innerHTML = "";
+        const { status_code, http_status, error_message, security_findings } =
+          result;
+        const httpCard = document.createElement("div");
+        httpCard.className = `p-4 rounded-lg border-l-4 ${
+          http_status === "PASSED"
+            ? "bg-indigo-50 border-indigo-400 text-indigo-700"
+            : "bg-red-50 border-red-400 text-red-700"
+        }`;
+        httpCard.innerHTML = `
+          <h3 class="text-lg font-semibold mb-1">HTTP Connection Status</h3>
+          <p class="font-bold text-xl">${status_code} - ${http_status}</p>
+          ${
+            error_message
+              ? `<p class="text-sm text-red-600 mt-2">Error: ${error_message}</p>`
+              : ""
+          }
+        `;
+        resultsContent.appendChild(httpCard);
+        for (const [header, details] of Object.entries(
+          security_findings || {}
+        )) {
           resultsContent.appendChild(
-            createFindingCard(
-              "X-Frame-Options (XFO)",
-              secFindings.xfo_status,
-              secFindings.xfo_value,
-              secFindings.xfo_notes
-            )
+            createCard(header, details.status, details.value, details.notes)
           );
         }
+        const headers = result.full_headers || {};
+        const formattedHeaders = Object.keys(headers)
+          .map((key) => `${key}: ${headers[key]}`)
+          .join("\n");
 
-        resultsContent.insertAdjacentHTML("afterbegin", html);
+        fullHeadersOutput.textContent = formattedHeaders;
+        fullHeadersOutput.classList.add("hidden");
+
         resultsContainer.classList.remove("hidden");
+        exportBtn.classList.remove("hidden");
         resultsContainer.scrollIntoView({ behavior: "smooth" });
       }
 
-      /**
-       * Main form submission handler
-       */
+      function renderDnsFindings(dnsResult) {
+        dnsResultsContent.innerHTML = "";
+
+        for (const [key, details] of Object.entries(dnsResult)) {
+          let title = key;
+          let status = "CHECK";
+          let notes = "";
+          let value = "";
+
+          if (details.status && details.status.includes("No")) {
+            status = "FAILED";
+            notes = details.status;
+          } else if (
+            key === "DMARC" &&
+            details.policy_strength &&
+            details.policy_strength.includes("none")
+          ) {
+            status = "WARNING";
+            notes = `Policy is '${details.policy_strength}'. Recommended policy is 'quarantine' or 'reject'.`;
+          } else if (
+            key === "SPF" &&
+            details.error &&
+            details.error.includes("Multiple")
+          ) {
+            status = "FAILED";
+            notes = details.error;
+          } else if (
+            details.status &&
+            details.status.includes("likely disabled")
+          ) {
+            status = "WARNING";
+            notes = details.status;
+          } else if (details.status || details.records_found) {
+            status = "PASSED";
+            notes = details.status || "Record(s) found and parsed.";
+            value = details.records_found
+              ? details.records_found.join(" | ")
+              : details.policy_strength || "";
+          } else if (details.error) {
+            status = "ERROR";
+            notes = details.error;
+          }
+
+          dnsResultsContent.appendChild(
+            createCard(title, status, value, notes)
+          );
+        }
+      }
+
+      function renderFingerprintFindings(fingerprintResult) {
+        fingerprintResultsContent.innerHTML = "";
+
+        if (Object.keys(fingerprintResult).length === 0) {
+          fingerprintResultsContent.innerHTML = `
+          <div class="p-4 rounded-lg border-l-4 bg-gray-50 border-gray-400 text-gray-700">
+              <h3 class="text-lg font-semibold mb-1">No infrastructure details found.</h3>
+              <p class="text-sm">The target site appears to be successfully suppressing technology headers.</p>
+          </div>
+      `;
+          return;
+        }
+
+        for (const [key, details] of Object.entries(fingerprintResult)) {
+          fingerprintResultsContent.appendChild(
+            createCard(key, details.status, details.value, details.notes)
+          );
+        }
+      }
+
+      function exportJSON(data, filename = "scan-results.json") {
+        const blob = new Blob([JSON.stringify(data, null, 2)], {
+          type: "application/json",
+        });
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement("a");
+        a.href = url;
+        a.download = filename;
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+      }
+
+      async function safeFetch(url, body) {
+        try {
+          const res = await fetch(url, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(body),
+          });
+          const data = await res.json();
+          // Ensure results object exists to prevent JS errors
+          if (!data.results) {
+            return {
+              results: { error: data.error || "Unexpected response structure" },
+            };
+          }
+          return data;
+        } catch (err) {
+          return {
+            results: { error: err.message || "Network or parsing error" },
+          };
+        }
+      }
+
       form.addEventListener("submit", async (e) => {
         e.preventDefault();
         resultsContainer.classList.add("hidden");
         messageBox.classList.add("hidden");
+        dnsResultsContent.innerHTML = "";
+        fingerprintResultsContent.innerHTML = "";
         toggleLoading(true);
 
-        const targetUrl = document.getElementById("targetUrl").value.trim();
-        const checkedChecks = Array.from(
-          form.querySelectorAll('input[name="checks"]:checked')
-        ).map((cb) => cb.value);
-
+        let targetUrl = document.getElementById("targetUrl").value.trim();
         if (!targetUrl) {
-          showMessage("Please enter a valid URL.", "error");
+          showMessage("Missing URL.");
+          toggleLoading(false);
+          return;
+        }
+        if (
+          !targetUrl.startsWith("http://") &&
+          !targetUrl.startsWith("https://")
+        ) {
+          targetUrl = "https://" + targetUrl;
+        }
+
+        let urlObject;
+        try {
+          urlObject = new URL(targetUrl);
+        } catch (e) {
+          showMessage("Invalid URL format. Please check the domain.", "error");
           toggleLoading(false);
           return;
         }
 
-        if (!API_BASE_URL) {
-          showMessage(
-            "The API Gateway URL is not configured. Please paste your Terraform output URL and reload this page.",
-            "error"
-          );
-          toggleLoading(false);
-          return;
-        }
+        const targetDomain = urlObject.hostname;
+        const httpTargetUrl = urlObject.origin + urlObject.pathname;
+        const checks = Array.from(
+          form.querySelectorAll('input[name="checks"]:checked')
+        ).map((c) => c.value);
+        const dnsGroupSelected = checks.includes("DNS_GROUP");
+        const httpChecks = checks.filter((c) => HTTP_SCAN_KEYS.includes(c));
+        const fingerprintChecks = checks.filter((c) =>
+          FINGERPRINT_KEYS.includes(c)
+        );
+        const dnsCheckRequired = dnsGroupSelected;
 
-        const payload = {
-          url: targetUrl,
-          checks: checkedChecks,
+        const combinedResults = {
+          http_scan: {},
+          dns_results: {},
+          fingerprint_results: {},
         };
 
-        const apiUrlWithResource = `${API_BASE_URL}/scan`;
+        // <<< UPDATED <<< Use safeFetch for all API calls
+        const httpScanPromise = safeFetch(`${API_BASE_URL}/scan`, {
+          url: httpTargetUrl,
+          checks: httpChecks,
+        });
+        const dnsScanPromise = dnsCheckRequired
+          ? safeFetch(`${API_BASE_URL}/dns`, { domain: targetDomain })
+          : Promise.resolve({ results: {} });
+        const fingerprintScanPromise =
+          fingerprintChecks.length > 0
+            ? safeFetch(`${API_BASE_URL}/fingerprint`, { url: httpTargetUrl })
+            : Promise.resolve({ results: {} });
 
         try {
-          const response = await fetch(apiUrlWithResource, {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify(payload),
-          });
+          const [httpData, dnsData, fingerprintData] = await Promise.all([
+            httpScanPromise,
+            dnsScanPromise,
+            fingerprintScanPromise,
+          ]);
 
-          const data = await response.json();
-
-          if (response.ok) {
-            const scanResult = data.results[0];
-            renderFindings(scanResult);
-            showMessage(
-              `Scan for ${targetUrl} completed successfully!`,
-              "success"
-            );
-          } else {
-            const errorMessage =
-              data.error ||
-              `Request failed with status ${
-                response.status
-              } and message: ${JSON.stringify(data)}`;
-            showMessage(errorMessage, "error");
+          // <<< UPDATED <<< Handle possible error messages from Lambda safely
+          if (httpData.results.error) {
+            showMessage(`HTTP Scan Error: ${httpData.results.error}`, "error");
+          } else if (httpData.results && httpData.results.length) {
+            const httpResult = httpData.results[0];
+            renderFindings(httpResult);
+            combinedResults.http_scan = httpResult;
           }
-        } catch (error) {
-          console.error("Fetch Error:", error);
+
+          if (dnsCheckRequired) {
+            if (dnsData.results.error) {
+              showMessage(
+                `DNS Scan Warning: ${dnsData.results.error}`,
+                "warning"
+              );
+            } else {
+              renderDnsFindings(dnsData.results);
+              combinedResults.dns_results = dnsData.results;
+            }
+          }
+
+          if (fingerprintChecks.length > 0) {
+            if (fingerprintData.results.error) {
+              showMessage(
+                `Fingerprint Scan Warning: ${fingerprintData.results.error}`,
+                "warning"
+              );
+            } else {
+              renderFingerprintFindings(fingerprintData.results);
+              combinedResults.fingerprint_results = fingerprintData.results;
+            }
+          }
+
+          exportBtn.onclick = () => exportJSON(combinedResults);
           showMessage(
-            `Could not connect to the scanner API: ${error.message}. Check the network and API URL.`,
-            "error"
+            `Scan for ${targetUrl} completed successfully.`,
+            "success"
           );
+        } catch (err) {
+          showMessage(`A scan request failed: ${err.message}`, "error");
         } finally {
           toggleLoading(false);
         }

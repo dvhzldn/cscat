@@ -1,67 +1,105 @@
-# 1. API Gateway resource
 resource "aws_api_gateway_rest_api" "scanner_api" {
   name        = "CSCATScannerAPI"
   description = "API Gateway for triggering the on-demand security scanner lambda."
 }
 
-# 2. Resource path (/scan)
-resource "aws_api_gateway_resource" "scan_resource" {
+locals {
+  cors_headers = {
+    "gatewayresponse.header.Access-Control-Allow-Origin"  = "'*'"
+    "gatewayresponse.header.Access-Control-Allow-Methods" = "'POST,OPTIONS'"
+    "gatewayresponse.header.Access-Control-Allow-Headers" = "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,Sec-Ch-Ua,Sec-Ch-Ua-Mobile,Sec-Ch-Ua-Platform,Dnt'"
+  }
+}
+
+# Global 4xx/5xx CORS-enabled responses
+resource "aws_api_gateway_gateway_response" "default_5xx_response" {
+  rest_api_id        = aws_api_gateway_rest_api.scanner_api.id
+  response_type      = "DEFAULT_5XX"
+  response_parameters = local.cors_headers
+}
+
+resource "aws_api_gateway_gateway_response" "default_4xx_response" {
+  rest_api_id        = aws_api_gateway_rest_api.scanner_api.id
+  response_type      = "DEFAULT_4XX"
+  response_parameters = local.cors_headers
+}
+
+# --- API Resources ---
+resource "aws_api_gateway_resource" "resources" {
+  for_each = {
+    scan        = "scan"
+    dns         = "dns"
+    fingerprint = "fingerprint"
+  }
+
   rest_api_id = aws_api_gateway_rest_api.scanner_api.id
   parent_id   = aws_api_gateway_rest_api.scanner_api.root_resource_id
-  path_part   = "scan"
+  path_part   = each.value
+
+  lifecycle {
+  prevent_destroy = true
+  }
 }
 
+# --- POST Methods (Lambda Proxy) ---
+resource "aws_api_gateway_method" "post_method" {
+  for_each = aws_api_gateway_resource.resources
 
-# 3. Method to allow POST and OPTIONS requests to /scan
-resource "aws_api_gateway_method" "scan_post_method" {
   rest_api_id   = aws_api_gateway_rest_api.scanner_api.id
-  resource_id   = aws_api_gateway_resource.scan_resource.id
+  resource_id   = each.value.id
   http_method   = "POST"
   authorization = "NONE"
-  api_key_required = false
-  lifecycle {
-    create_before_destroy = true
-  }
 }
 
-resource "aws_api_gateway_method" "scan_options_method" {
-  rest_api_id      = aws_api_gateway_rest_api.scanner_api.id
-  resource_id      = aws_api_gateway_resource.scan_resource.id
-  http_method      = "OPTIONS"
-  authorization    = "NONE"
-  lifecycle {
-    create_before_destroy = true
-  }
-}
+resource "aws_api_gateway_integration" "post_integration" {
+  for_each = aws_api_gateway_method.post_method
 
-# 4. Integration with Lambda
-resource "aws_api_gateway_integration" "lambda_integration" {
   rest_api_id             = aws_api_gateway_rest_api.scanner_api.id
-  resource_id             = aws_api_gateway_resource.scan_resource.id
-  http_method             = aws_api_gateway_method.scan_post_method.http_method
+  resource_id             = each.value.resource_id
+  http_method             = each.value.http_method
   integration_http_method = "POST"
   type                    = "AWS_PROXY"
-  uri                     = aws_lambda_function.scanner_function.invoke_arn
+
+  uri = "arn:aws:apigateway:${var.aws_region}:lambda:path/2015-03-31/functions/${lookup(
+    {
+      scan        = aws_lambda_function.scanner_function.arn,
+      dns         = aws_lambda_function.dns_scanner_function.arn,
+      fingerprint = aws_lambda_function.fingerprint_scanner_function.arn
+    },
+    each.key
+  )}/invocations"
 }
 
-# 4b. Mock integration for OPTIONS method (CORS preflight)
+# --- OPTIONS (Mock Integration for CORS) ---
+resource "aws_api_gateway_method" "options_method" {
+  for_each = aws_api_gateway_resource.resources
+
+  rest_api_id   = aws_api_gateway_rest_api.scanner_api.id
+  resource_id   = each.value.id
+  http_method   = "OPTIONS"
+  authorization = "NONE"
+}
+
 resource "aws_api_gateway_integration" "options_integration" {
-  rest_api_id = aws_api_gateway_rest_api.scanner_api.id
-  resource_id = aws_api_gateway_resource.scan_resource.id
-  http_method = aws_api_gateway_method.scan_options_method.http_method
-  type        = "MOCK"
+  for_each = aws_api_gateway_method.options_method
+
+  rest_api_id             = aws_api_gateway_rest_api.scanner_api.id
+  resource_id             = each.value.resource_id
+  http_method             = each.value.http_method
+  type                    = "MOCK"
+
+  request_templates = {
+    "application/json" = "{\"statusCode\":200}"
+  }
 }
 
-# 4c. Method response for OPTIONS
-resource "aws_api_gateway_method_response" "options_200_response" {
-  rest_api_id = aws_api_gateway_rest_api.scanner_api.id
-  resource_id = aws_api_gateway_resource.scan_resource.id
-  http_method = aws_api_gateway_method.scan_options_method.http_method
-  status_code = "200"
+resource "aws_api_gateway_method_response" "options_response" {
+  for_each = aws_api_gateway_method.options_method
 
-  response_models = {
-    "application/json" = "Empty"
-  }
+  rest_api_id = aws_api_gateway_rest_api.scanner_api.id
+  resource_id = each.value.resource_id
+  http_method = each.value.http_method
+  status_code = "200"
 
   response_parameters = {
     "method.response.header.Access-Control-Allow-Headers" = true
@@ -70,39 +108,33 @@ resource "aws_api_gateway_method_response" "options_200_response" {
   }
 }
 
-# 4d. Integration response for OPTIONS (setting the actual header values)
 resource "aws_api_gateway_integration_response" "options_integration_response" {
-  rest_api_id = aws_api_gateway_rest_api.scanner_api.id
-  resource_id = aws_api_gateway_resource.scan_resource.id
-  http_method = aws_api_gateway_method.scan_options_method.http_method
-  status_code = aws_api_gateway_method_response.options_200_response.status_code
+  for_each = aws_api_gateway_integration.options_integration
 
-  response_templates = {
-    "application/json" = ""
-  }
+  rest_api_id = aws_api_gateway_rest_api.scanner_api.id
+  resource_id = each.value.resource_id
+  http_method = each.value.http_method
+  status_code = aws_api_gateway_method_response.options_response[each.key].status_code
 
   response_parameters = {
-    "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token'"
+    "method.response.header.Access-Control-Allow-Headers" = "'Content-Type,X-Amz-Date,Authorization,X-Api-Key,X-Amz-Security-Token,Sec-Ch-Ua,Sec-Ch-Ua-Mobile,Sec-Ch-Ua-Platform,Dnt'"
     "method.response.header.Access-Control-Allow-Methods" = "'POST,OPTIONS'"
     "method.response.header.Access-Control-Allow-Origin"  = "'*'"
   }
-
-  depends_on = [aws_api_gateway_integration.options_integration]
 }
 
-# 5. Deployment
+# --- Deployment ---
 resource "aws_api_gateway_deployment" "scanner_deployment" {
   rest_api_id = aws_api_gateway_rest_api.scanner_api.id
+  description = "Deployment at ${timestamp()}"
+
   triggers = {
-    redeployment = sha1(jsonencode([
-      aws_api_gateway_rest_api.scanner_api.id,
-      aws_api_gateway_resource.scan_resource.id,
-      aws_api_gateway_method.scan_post_method.id,
-      aws_api_gateway_method.scan_options_method.id,
-      aws_api_gateway_integration.lambda_integration.id,
-      aws_api_gateway_integration.options_integration.id,
-      aws_api_gateway_method_response.options_200_response.id,
-      aws_api_gateway_integration_response.options_integration_response.id,
+    redeploy_hash = sha1(jsonencode([
+      aws_api_gateway_resource.resources,
+      aws_api_gateway_method.post_method,
+      aws_api_gateway_integration.post_integration,
+      aws_api_gateway_method.options_method,
+      aws_api_gateway_integration.options_integration
     ]))
   }
 
@@ -111,14 +143,13 @@ resource "aws_api_gateway_deployment" "scanner_deployment" {
   }
 }
 
-# 6. Stage definition (callable URL)
 resource "aws_api_gateway_stage" "prod" {
-  deployment_id = aws_api_gateway_deployment.scanner_deployment.id
   rest_api_id   = aws_api_gateway_rest_api.scanner_api.id
+  deployment_id = aws_api_gateway_deployment.scanner_deployment.id
   stage_name    = "prod"
+  description   = "Production Stage"
 }
 
-# 7. URL for frontend to use
 output "api_gateway_url" {
   description = "The base URL for the API Gateway stage"
   value       = aws_api_gateway_stage.prod.invoke_url

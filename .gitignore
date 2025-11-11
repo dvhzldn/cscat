@@ -1,12 +1,18 @@
 # ------------------------------------
 # 1. TERRAFORM AND STATE FILES (MUST IGNORE)
 # ------------------------------------
-.terraform/           # Local provider cache (contains massive binary files)
-.terraform.lock.hcl   # Local provider version lock
-*.tfplan              # Binary plan files
-*.tfstate             # Local state files
-*.tfstate.* # Backup state files
-crash.log             # Terraform crash logs
+**/.terraform/
+**/.terraform.lock.hcl
+*.tfplan
+*.tfstate
+*.tfstate.*
+crash.log
+override.tf
+override.tf.json
+*_override.tf
+*_override.tf.json
+.terraformrc
+terraform.rc
 
 # ------------------------------------
 # 2. PYTHON & VIRTUAL ENVIRONMENT (MUST IGNORE)
