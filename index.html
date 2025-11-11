@@ -361,14 +361,13 @@
           const data = await response.json();
 
           if (response.ok) {
-            const scanResult = data.results[0]; // Assuming one result per on-demand scan
+            const scanResult = data.results[0];
             renderFindings(scanResult);
             showMessage(
               `Scan for ${targetUrl} completed successfully!`,
               "success"
             );
           } else {
-            // API Gateway or Lambda returned an error status
             const errorMessage =
               data.error ||
               `Request failed with status ${
