@@ -45,6 +45,15 @@ jobs:
         run: terraform plan -input=false -out=tfplan
         working-directory: ${{ env.TF_WORKING_DIR }}
 
+      - name: 🔄 One-Time State Cleanup for POST Method
+        # This step forces the state file to forget the old 'scan_method'
+        # that is conflicting with the new 'scan_post_method' resource name.
+        run: |
+          echo "Attempting to remove old conflicting resource from state..."
+          # The '|| true' ensures the step doesn't fail if the resource is already gone.
+          terraform state rm 'aws_api_gateway_method.scan_method' || true
+        shell: bash
+
       - name: Terraform Apply
         run: terraform apply -auto-approve tfplan
         working-directory: ${{ env.TF_WORKING_DIR }}
