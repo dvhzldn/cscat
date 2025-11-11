@@ -115,7 +115,7 @@ resource "aws_lambda_permission" "allow_cloudwatch_to_invoke_lambda" {
 resource "aws_lambda_permission" "apigw_lambda_invoke" {
   statement_id  = "AllowExecutionFromAPIGateway"
   action        = "lambda:InvokeFunction"
-  function_name = aws_lambda_function.scanner_lambda.function_name
+  function_name = aws_lambda_function.scanner_function.function_name
   principal     = "apigateway.amazonaws.com"
   source_arn = "${aws_api_gateway_rest_api.scanner_api.execution_arn}/*/*"
 }
