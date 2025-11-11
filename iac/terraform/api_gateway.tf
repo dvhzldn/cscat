@@ -11,21 +11,29 @@ resource "aws_api_gateway_resource" "scan_resource" {
   path_part   = "scan"
 }
 
-# 3. Method to allow POST requests to /scan
-resource "aws_api_gateway_method" "scan_method" {
+# 3. Method to allow POST and OPTIONS requests to /scan
+resource "aws_api_gateway_method" "scan_post_method" {
   rest_api_id   = aws_api_gateway_rest_api.scanner_api.id
   resource_id   = aws_api_gateway_resource.scan_resource.id
   http_method   = "POST"
-  authorization = "NONE" # Publicly accessible endpoint for the web app
+  authorization = "NONE"
+  api_key_required = false
+}
+
+resource "aws_api_gateway_method" "scan_options_method" {
+  rest_api_id      = aws_api_gateway_rest_api.scanner_api.id
+  resource_id      = aws_api_gateway_resource.scan_resource.id
+  http_method      = "OPTIONS"
+    authorization    = "NONE"
 }
 
 # 4. Integration with Lambda
 resource "aws_api_gateway_integration" "lambda_integration" {
   rest_api_id             = aws_api_gateway_rest_api.scanner_api.id
   resource_id             = aws_api_gateway_resource.scan_resource.id
-  http_method             = aws_api_gateway_method.scan_method.http_method
+  http_method             = aws_api_gateway_method.scan_post_method.http_method
   integration_http_method = "POST"
-  type                    = "AWS_PROXY" # Simple passthrough integration
+  type                    = "AWS_PROXY"
   uri                     = aws_lambda_function.scanner_function.invoke_arn
 }
 
@@ -36,7 +44,8 @@ resource "aws_api_gateway_deployment" "scanner_deployment" {
   triggers = {
     redeployment = sha1(jsonencode([
       aws_api_gateway_resource.scan_resource.id,
-      aws_api_gateway_method.scan_method.id,
+      aws_api_gateway_method.scan_post_method.id,
+      aws_api_gateway_method.scan_options_method.id,
       aws_api_gateway_integration.lambda_integration.id,
     ]))
   }
