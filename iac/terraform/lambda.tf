@@ -73,7 +73,14 @@ resource "aws_lambda_function" "scanner_function" {
   # Use Container Image package type
   package_type  = "Image"
   # Use the ECR image URI output from the previous phase
-  image_uri = "${aws_ecr_repository.scanner_repository.repository_url}:latest"
+  image_uri     = aws_ecr_repository.scanner_repository.repository_url
+  lifecycle {
+    # Terraform will create the function, but will ignore any changes made to
+    # the image_uri by external processes (like your CI/CD's aws lambda update-function-code).
+    ignore_changes = [
+      image_uri,
+    ]
+  }
   # Set the timeout to 30 seconds (future scans may be longer)
   timeout       = 30
   memory_size   = 128 # Default memory size is cost-effective and should suffice for HTTP checks
