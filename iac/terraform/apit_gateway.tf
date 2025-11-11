@@ -26,7 +26,7 @@ resource "aws_api_gateway_integration" "lambda_integration" {
   http_method             = aws_api_gateway_method.scan_method.http_method
   integration_http_method = "POST"
   type                    = "AWS_PROXY" # Simple passthrough integration
-  uri                     = aws_lambda_function.scanner_lambda.invoke_arn
+  uri                     = aws_lambda_function.scanner_function.invoke_arn
 }
 
 # 5. Deployment
