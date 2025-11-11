@@ -1,3 +1,11 @@
+data "archive_file" "placeholder" {
+  type        = "zip"
+  source_content = "def handler(event, context): return 'Initializing'"
+  output_path = "${path.module}/placeholder.zip"
+}
+
+data "aws_caller_identity" "current" {}
+
 resource "aws_iam_role" "lambda_exec_role" {
   name = "${var.project_name}-${var.environment}-lambda-role"
 
@@ -53,26 +61,16 @@ resource "aws_iam_role_policy" "lambda_permissions_policy" {
   })
 }
 
-data "aws_caller_identity" "current" {}
-
 resource "aws_lambda_function" "scanner_function" {
   function_name = "${var.project_name}-${var.environment}-scanner"
   role          = aws_iam_role.lambda_exec_role.arn
 
   package_type  = "Zip"
   runtime       = "python3.9"
-  handler       = "app.lambda_handler"
+  handler       = "index.handler"
 
-  s3_bucket     = aws_s3_bucket.report_bucket.id
-  s3_key        = "deployment/scanner.zip"
-
-  lifecycle {
-    ignore_changes = [
-      s3_bucket,
-      s3_key,
-      source_code_hash,
-    ]
-  }
+  filename         = data.archive_file.placeholder.output_path
+  source_code_hash = data.archive_file.placeholder.output_base64sha256
 
   timeout       = 30
   memory_size   = 128
