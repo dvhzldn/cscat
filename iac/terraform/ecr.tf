@@ -29,7 +29,7 @@ resource "aws_s3_bucket" "report_bucket" {
     enabled = true # Best practice for protecting reports from accidental deletion/overwrites
   }
 
-  server_side_encryption configuration {
+  server_side_encryption_configuration {
     rule {
       apply_server_side_encryption_by_default {
         sse_algorithm = "AES256" # Use S3-managed encryption, which is free

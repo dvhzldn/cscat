@@ -29,7 +29,6 @@ jobs:
       - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          # Assumes the ARN of the IAM Role is stored as a repository secret
           role-to-assume: arn:aws:iam::${{secrets.AWS_ACCOUNT_ID}}:role/GitHubActions-DevSecOps-Role
           aws-region: ${{ env.AWS_REGION }}
           # The web identity token file path is automatically handled by the action
@@ -69,8 +68,9 @@ jobs:
 
       - name: Terraform Init
         id: init
-        run:
-          terraform init -backend-config="bucket=${{ secrets.TF_STATE_BUCKET }}"
+        # Now passing bucket/table names via secrets, matching your backend.tf which should only have the key/region.
+        run: |
+          terraform init -backend-config="bucket=${{ secrets.TF_STATE_BUCKET }}" \
           -backend-config="dynamodb_table=${{ secrets.TF_LOCK_TABLE }}"
         working-directory: ${{ env.TF_WORKING_DIR }}
         env:

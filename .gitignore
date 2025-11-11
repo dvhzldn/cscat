@@ -1,0 +1,42 @@
+# ------------------------------------
+# 1. TERRAFORM AND STATE FILES (MUST IGNORE)
+# ------------------------------------
+.terraform/           # Local provider cache (contains massive binary files)
+.terraform.lock.hcl   # Local provider version lock
+*.tfplan              # Binary plan files
+*.tfstate             # Local state files
+*.tfstate.* # Backup state files
+crash.log             # Terraform crash logs
+
+# ------------------------------------
+# 2. PYTHON & VIRTUAL ENVIRONMENT (MUST IGNORE)
+# ------------------------------------
+# Virtual environment folders
+venv/
+.venv/
+env/
+.env/
+
+# Compiled Python artifacts
+__pycache__/
+*.pyc
+*.pyd
+
+# Dependencies managed by pip
+site-packages/
+
+# ------------------------------------
+# 3. BUILD ARTIFACTS & IDE FILES
+# ------------------------------------
+# Build/Distribution folders
+/dist/
+/build/
+
+# macOS files
+.DS_Store
+
+# VS Code IDE files
+.vscode/
+
+# Local AWS files (if applicable, for profiles/credentials)
+.aws/
