@@ -66,6 +66,14 @@ resource "aws_lambda_function" "scanner_function" {
   s3_bucket     = aws_s3_bucket.report_bucket.id
   s3_key        = "deployment/scanner.zip"
 
+  lifecycle {
+    ignore_changes = [
+      s3_bucket,
+      s3_key,
+      source_code_hash,
+    ]
+  }
+
   timeout       = 30
   memory_size   = 128
 
