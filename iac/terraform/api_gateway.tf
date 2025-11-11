@@ -11,6 +11,13 @@ resource "aws_api_gateway_resource" "scan_resource" {
   path_part   = "scan"
 }
 
+resource "aws_api_gateway_method" "scan_method" {
+  rest_api_id   = aws_api_gateway_rest_api.scanner_api.id
+  resource_id   = aws_api_gateway_resource.scan_resource.id
+  http_method   = "POST"
+  authorization = "NONE" # Matching the authorization level
+}
+
 # 3. Method to allow POST and OPTIONS requests to /scan
 resource "aws_api_gateway_method" "scan_post_method" {
   rest_api_id   = aws_api_gateway_rest_api.scanner_api.id
