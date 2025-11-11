@@ -18,13 +18,19 @@ resource "aws_api_gateway_method" "scan_post_method" {
   http_method   = "POST"
   authorization = "NONE"
   api_key_required = false
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
 resource "aws_api_gateway_method" "scan_options_method" {
   rest_api_id      = aws_api_gateway_rest_api.scanner_api.id
   resource_id      = aws_api_gateway_resource.scan_resource.id
   http_method      = "OPTIONS"
-    authorization    = "NONE"
+  authorization    = "NONE"
+  lifecycle {
+    create_before_destroy = true
+  }
 }
 
 # 4. Integration with Lambda
@@ -40,9 +46,9 @@ resource "aws_api_gateway_integration" "lambda_integration" {
 # 5. Deployment
 resource "aws_api_gateway_deployment" "scanner_deployment" {
   rest_api_id = aws_api_gateway_rest_api.scanner_api.id
-  # Re-deploy every time the integration changes
   triggers = {
     redeployment = sha1(jsonencode([
+      aws_api_gateway_rest_api.scanner_api.id,
       aws_api_gateway_resource.scan_resource.id,
       aws_api_gateway_method.scan_post_method.id,
       aws_api_gateway_method.scan_options_method.id,
