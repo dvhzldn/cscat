@@ -692,8 +692,14 @@
 
       function renderFindings(result) {
         resultsContent.innerHTML = "";
-        const { status_code, http_status, error_message, security_findings } =
-          result;
+        const {
+          status_code,
+          http_status,
+          error_message,
+          security_findings,
+          full_headers,
+        } = result;
+
         const httpCard = document.createElement("div");
         httpCard.className = `p-4 rounded-lg border-l-4 ${
           http_status === "PASSED"
@@ -701,15 +707,16 @@
             : "bg-red-50 border-red-400 text-red-700"
         }`;
         httpCard.innerHTML = `
-          <h3 class="text-lg font-semibold mb-1">HTTP Connection Status</h3>
-          <p class="font-bold text-xl">${status_code} - ${http_status}</p>
-          ${
-            error_message
-              ? `<p class="text-sm text-red-600 mt-2">Error: ${error_message}</p>`
-              : ""
-          }
-        `;
+    <h3 class="text-lg font-semibold mb-1">HTTP Connection Status</h3>
+    <p class="font-bold text-xl">${status_code} - ${http_status}</p>
+    ${
+      error_message
+        ? `<p class="text-sm text-red-600 mt-2">Error: ${error_message}</p>`
+        : ""
+    }
+  `;
         resultsContent.appendChild(httpCard);
+
         for (const [header, details] of Object.entries(
           security_findings || {}
         )) {
@@ -717,9 +724,11 @@
             createCard(header, details.status, details.value, details.notes)
           );
         }
-        const headers = result.full_headers || {};
-        const formattedHeaders = Object.keys(headers)
-          .map((key) => `${key}: ${headers[key]}`)
+
+        // Correctly reference full_headers from the result
+        const headersToShow = full_headers || {};
+        const formattedHeaders = Object.keys(headersToShow)
+          .map((key) => `${key}: ${headersToShow[key]}`)
           .join("\n");
 
         fullHeadersOutput.textContent = formattedHeaders;
@@ -903,13 +912,16 @@
             fingerprintScanPromise,
           ]);
 
-          // <<< UPDATED <<< Handle possible error messages from Lambda safely
           if (httpData.results.error) {
             showMessage(`HTTP Scan Error: ${httpData.results.error}`, "error");
-          } else if (httpData.results && httpData.results.length) {
-            const httpResult = httpData.results[0];
-            renderFindings(httpResult);
-            combinedResults.http_scan = httpResult;
+          } else if (httpData.results) {
+            renderFindings({
+              status_code: 200,
+              http_status: "OK",
+              security_findings: httpData.results,
+              full_headers: httpData.full_headers || {},
+            });
+            combinedResults.http_scan = httpData.results;
           }
 
           if (dnsCheckRequired) {
