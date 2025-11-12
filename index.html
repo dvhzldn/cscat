@@ -111,6 +111,98 @@
               </label>
               <label
                 class="flex items-center p-3 bg-gray-50 rounded-lg border border-gray-200 cursor-pointer hover:bg-indigo-50"
+                title="Checks for Secure, HttpOnly, and SameSite flags on all cookies."
+              >
+                <input
+                  type="checkbox"
+                  name="checks"
+                  value="Set-Cookie"
+                  checked
+                  class="h-5 w-5 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                />
+                <span class="ml-3 text-sm font-medium text-gray-800"
+                  >Cookie Security (Set-Cookie)</span
+                >
+              </label>
+
+              <label
+                class="flex items-center p-3 bg-gray-50 rounded-lg border border-gray-200 cursor-pointer hover:bg-indigo-50"
+                title="CORP: Prevents others from embedding your resources cross-origin, mitigating data theft."
+              >
+                <input
+                  type="checkbox"
+                  name="checks"
+                  value="Cross-Origin-Resource-Policy"
+                  checked
+                  class="h-5 w-5 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                />
+                <span class="ml-3 text-sm font-medium text-gray-800"
+                  >Cross-Origin-Resource-Policy</span
+                >
+              </label>
+              <label
+                class="flex items-center p-3 bg-gray-500 rounded-lg border border-gray-200 cursor-pointer hover:bg-indigo-50"
+                title="COOP: Isolates the document from cross-origin windows to prevent specific attacks."
+              >
+                <input
+                  type="checkbox"
+                  name="checks"
+                  value="Cross-Origin-Opener-Policy"
+                  checked
+                  class="h-5 w-5 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                />
+                <span class="ml-3 text-sm font-medium text-gray-800"
+                  >Cross-Origin-Opener-Policy</span
+                >
+              </label>
+
+              <label
+                class="flex items-center p-3 bg-gray-50 rounded-lg border border-gray-200 cursor-pointer hover:bg-indigo-50"
+                title="Reveals web server software (such as Nginx, Apache etc.). Recommended to hide this in production."
+              >
+                <input
+                  type="checkbox"
+                  name="checks"
+                  value="Server"
+                  checked
+                  class="h-5 w-5 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                />
+                <span class="ml-3 text-sm font-medium text-gray-800"
+                  >Server Header (Information Disclosure)</span
+                >
+              </label>
+              <label
+                class="flex items-center p-3 bg-gray-50 rounded-lg border border-gray-200 cursor-pointer hover:bg-indigo-50"
+                title="Reveals backend languages/frameworks (PHP, ASP.NET etc.). Recommended to suppress this."
+              >
+                <input
+                  type="checkbox"
+                  name="checks"
+                  value="X-Powered-By"
+                  checked
+                  class="h-5 w-5 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                />
+                <span class="ml-3 text-sm font-medium text-gray-800"
+                  >X-Powered-By (Information Disclosure)</span
+                >
+              </label>
+              <label
+                class="flex items-center p-3 bg-gray-50 rounded-lg border border-gray-200 cursor-pointer hover:bg-indigo-50"
+                title="Specific disclosure for ASP.NET versions. Recommended to suppress this."
+              >
+                <input
+                  type="checkbox"
+                  name="checks"
+                  value="X-AspNet-Version"
+                  checked
+                  class="h-5 w-5 text-indigo-600 border-gray-300 rounded focus:ring-indigo-500"
+                />
+                <span class="ml-3 text-sm font-medium text-gray-800"
+                  >X-AspNet-Version (Information Disclosure)</span
+                >
+              </label>
+              <label
+                class="flex items-center p-3 bg-gray-50 rounded-lg border border-gray-200 cursor-pointer hover:bg-indigo-50"
                 title="XFO: Prevents clickjacking by controlling if the page can be loaded in an iframe."
               >
                 <input
@@ -493,6 +585,47 @@
           failed:
             "Missing. Allows any third-party website to embed the site's resources, potentially leading to data theft via side-channel attacks.",
         },
+        "Cookie-Security": {
+          title: "Cookie Security Flags (Secure, HttpOnly, SameSite)",
+          description:
+            "Checks all 'Set-Cookie' headers for critical security flags that prevent XSS and man-in-the-middle attacks.",
+          passed:
+            "All cookies found are secured with Secure, HttpOnly, and a strong SameSite policy.",
+          failed:
+            "One or more cookies are missing the Secure, HttpOnly, or SameSite flag, posing a high risk for hijacking or XSS.",
+        },
+
+        // Update X_Powered_By (If you didn't change the key in the Python code, use 'X_Powered_By', otherwise use 'X-Powered-By')
+        // Note: Assuming you fixed the key in the HTML to 'X-Powered-By' as recommended earlier.
+        "X-Powered-By": {
+          title: "X-Powered-By Header",
+          description:
+            "This header often reveals the programming language or framework used, which should be suppressed in production.",
+          passed:
+            "The X-Powered-By header is not present, limiting information disclosure.",
+          failed:
+            "The header is present and reveals internal technology details.",
+        },
+
+        // Add the new key for the specific ASP.NET version disclosure
+        "X-AspNet-Version": {
+          title: "X-AspNet-Version Header",
+          description:
+            "This header specifically reveals the ASP.NET framework version, which is a key piece of information for attackers.",
+          passed: "The header is not present, limiting version disclosure.",
+          failed: "The header is present and reveals the ASP.NET version.",
+        },
+
+        // Update the existing 'Server' check to reflect the new logic (status: INFO)
+        Server: {
+          title: "Web Server Identification",
+          description:
+            "Identifies the web server software. If exposed, this information aids in attacker reconnaissance.",
+          passed:
+            "The Server header is either missing or reports non-specific information.",
+          failed:
+            "The Server header explicitly reveals the software and version, which is a common information leak.",
+        },
         SPF: {
           title: "SPF (Sender Policy Framework)",
           description:
@@ -617,10 +750,17 @@
         "Permissions-Policy",
         "Cross-Origin-Opener-Policy",
         "Cross-Origin-Resource-Policy",
+        "Cookie-Security", // <-- NEW: The output key from the backend check
         "Server",
-        "X_Powered_By",
+        "X-Powered-By", // <-- Corrected key to match backend best practice
+        "X-AspNet-Version", // <-- NEW
       ];
-      const FINGERPRINT_KEYS = ["Server", "X_Powered_By", "Technology_Stack"];
+      const FINGERPRINT_KEYS = [
+        "Server",
+        "X-Powered-By", // <-- Corrected key
+        "X-AspNet-Version", // <-- NEW
+        "Technology_Stack",
+      ];
       const DNS_KEYS = ["SPF", "DMARC", "DKIM", "DNSSEC"];
 
       // --- Event Listeners ---
@@ -678,6 +818,9 @@
         } else if (status === "FAILED") {
           color = "red";
           statusMessage = details.failed;
+        } else if (status === "INFO") {
+          color = "gray";
+          statusMessage = notes;
         } else if (status === "ERROR") {
           color = "red";
           statusMessage = `An unexpected error occurred during the check: ${notes}`;

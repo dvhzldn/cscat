@@ -1,6 +1,7 @@
 import json
 import requests
-from urllib.parse import urlparse
+import re
+from urllib.parse import urlparse, urlunparse
 
 CORS_HEADERS = {
     "Access-Control-Allow-Origin": "*",
@@ -22,6 +23,28 @@ def respond(status_code, body):
     }
 
 
+def _check_hsts_security(hsts_value: str) -> bool:
+    """Checks HSTS header for max-age >= 1 year and includeSubDomains."""
+    if not hsts_value:
+        return False
+
+    value_lower = hsts_value.lower()
+
+    if "includesubdomains" not in value_lower:
+        return False
+
+    match = re.search(r"max-age=(\d+)", value_lower)
+
+    if match:
+        try:
+            max_age = int(match.group(1))
+            return max_age >= 31536000
+        except ValueError:
+            return False
+
+    return False
+
+
 HTTP_HEADERS_TO_CHECK = [
     "Strict-Transport-Security",
     "X-Frame-Options",
@@ -31,7 +54,94 @@ HTTP_HEADERS_TO_CHECK = [
     "Permissions-Policy",
     "Cross-Origin-Opener-Policy",
     "Cross-Origin-Resource-Policy",
+    "Set-Cookie",
 ]
+
+
+def _check_csp(csp_value: str) -> dict:
+    """Performs an in-depth check of Content-Security-Policy directives."""
+    findings = []
+
+    if not csp_value:
+        return {"status": "FAILED", "notes": "Missing Content-Security-Policy."}
+
+    critical_directives = {
+        "object-src": ["'none'"],
+        "base-uri": ["'self'"],
+    }
+
+    if "'unsafe-inline'" in csp_value.lower():
+        findings.append(
+            "WARNING: CSP allows 'unsafe-inline'. This weakens XSS protection."
+        )
+    if "'unsafe-eval'" in csp_value.lower():
+        findings.append(
+            "WARNING: CSP allows 'unsafe-eval'. This weakens XSS protection."
+        )
+
+    for directive, safe_values in critical_directives.items():
+        match = re.search(rf"\b{directive}\s+([^;]+)", csp_value, re.IGNORECASE)
+
+        if not match:
+            findings.append(f"WARNING: Missing restrictive '{directive}' directive.")
+        else:
+            value = match.group(1).strip()
+            if not any(sv in value.lower() for sv in safe_values):
+                findings.append(f"WARNING: Unsafe value for '{directive}': {value}")
+
+    if not findings:
+        return {"status": "PASSED", "notes": "CSP is present and appears robust."}
+    elif len(findings) < 2:
+        return {"status": "WARNING", "notes": "; ".join(findings)}
+    else:
+        return {
+            "status": "FAILED",
+            "notes": "Multiple critical CSP weaknesses found: " + "; ".join(findings),
+        }
+
+
+def _check_cookie_security(set_cookie_headers: list) -> dict:
+    """Checks 'Set-Cookie' headers for Secure, HttpOnly, and SameSite flags."""
+    if not set_cookie_headers:
+        return {"status": "INFO", "notes": "No 'Set-Cookie' headers found."}
+
+    vulnerable_cookies = []
+
+    for cookie_string in set_cookie_headers:
+        name_match = re.match(r"([^=]+)=", cookie_string)
+        cookie_name = name_match.group(1) if name_match else "Unnamed Cookie"
+
+        if "secure" not in cookie_string.lower():
+            vulnerable_cookies.append(
+                f"'{cookie_name}' is missing the 'Secure' flag (Critical)."
+            )
+        if "httponly" not in cookie_string.lower():
+            vulnerable_cookies.append(
+                f"'{cookie_name}' is missing the 'HttpOnly' flag (High)."
+            )
+
+        samesite_match = re.search(
+            r"SameSite=(Strict|Lax|None)", cookie_string, re.IGNORECASE
+        )
+        if not samesite_match:
+            vulnerable_cookies.append(
+                f"'{cookie_name}' is missing the 'SameSite' flag (High)."
+            )
+        elif (
+            samesite_match.group(1).lower() == "none"
+            and "secure" not in cookie_string.lower()
+        ):
+            vulnerable_cookies.append(
+                f"'{cookie_name}' has SameSite=None but lacks 'Secure' (Critical)."
+            )
+
+    if not vulnerable_cookies:
+        return {"status": "PASSED", "notes": "All 'Set-Cookie' headers appear secure."}
+
+    return {
+        "status": "FAILED",
+        "notes": "Vulnerable Cookies Found: " + " | ".join(vulnerable_cookies),
+    }
 
 
 def scan_url(url: str, checks: list[str]) -> list[dict]:
@@ -62,15 +172,15 @@ def scan_url(url: str, checks: list[str]) -> list[dict]:
         return {
             "status": "PASSED" if condition(value) else "WARNING",
             "value": value,
-            "notes": pass_note,
+            "notes": pass_note if condition(value) else fail_note,
         }
 
     for header_name, condition, pass_note, fail_note in [
         (
             "Strict-Transport-Security",
-            lambda v: "max-age" in v and "includeSubDomains" in v,
-            "HSTS configured properly.",
-            "Missing or incomplete HSTS header.",
+            _check_hsts_security,
+            "HSTS configured properly with long max-age and includeSubDomains.",
+            "Missing HSTS or max-age is too short or missing includeSubDomains.",
         ),
         (
             "X-Frame-Options",
@@ -83,12 +193,6 @@ def scan_url(url: str, checks: list[str]) -> list[dict]:
             lambda v: v.lower() == "nosniff",
             "Prevents MIME-type sniffing.",
             "Missing or invalid X-Content-Type-Options.",
-        ),
-        (
-            "Content-Security-Policy",
-            lambda v: bool(v.strip()),
-            "CSP present.",
-            "Missing Content-Security-Policy.",
         ),
         (
             "Referrer-Policy",
@@ -126,6 +230,26 @@ def scan_url(url: str, checks: list[str]) -> list[dict]:
                 f"{header} correctly set.",
                 f"Missing or incorrect {header}.",
             )
+
+    if "Content-Security-Policy" in checks:
+        csp_header = headers.get("Content-Security-Policy")
+        findings["Content-Security-Policy"] = _check_csp(csp_header or "")
+
+    if "Set-Cookie" in checks:
+        try:
+            set_cookie_headers = resp.raw.headers.getlist("Set-Cookie")
+        except AttributeError:
+            set_cookie_headers = resp.headers.get("Set-Cookie", "").split(",")
+
+        findings["Cookie-Security"] = _check_cookie_security(set_cookie_headers)
+
+    for info_header in ["Server", "X-Powered-By", "X-AspNet-Version"]:
+        if headers.get(info_header):
+            findings[info_header] = {
+                "status": "INFO",
+                "value": headers[info_header],
+                "notes": f"Server information disclosed via '{info_header}' header. Consider suppression.",
+            }
 
     return [
         {
