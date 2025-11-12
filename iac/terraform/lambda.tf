@@ -86,7 +86,7 @@ resource "aws_lambda_function" "scanner_function" {
   function_name = "cscat-dev-scanner"
   role          = aws_iam_role.lambda_role.arn
   runtime       = "python3.12"
-  handler       = "index.handler"
+  handler       = "index.lambda_handler"
   timeout       = 30
 
   filename         = data.archive_file.scanner_zip.output_path
@@ -97,7 +97,7 @@ resource "aws_lambda_function" "dns_scanner_function" {
   function_name = "cscat-dev-dns-scanner"
   role          = aws_iam_role.lambda_role.arn
   runtime       = "python3.12"
-  handler       = "index.handler"
+  handler       = "index.lambda_handler"
   timeout       = 30
 
   filename         = data.archive_file.dns_zip.output_path
@@ -108,7 +108,7 @@ resource "aws_lambda_function" "fingerprint_scanner_function" {
   function_name = "cscat-dev-fingerprint-scanner"
   role          = aws_iam_role.lambda_role.arn
   runtime       = "python3.12"
-  handler       = "index.handler"
+  handler       = "index.lambda_handler"
   timeout       = 30
 
   filename         = data.archive_file.fingerprint_zip.output_path
