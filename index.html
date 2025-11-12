@@ -583,7 +583,48 @@
       const toggleChecksBtn = document.getElementById("toggleChecksBtn");
       const checksContainer = document.getElementById("checksContainer");
       const toggleIcon = document.getElementById("toggleIcon");
-      const toggleHeadersBtn = document.getElementById("toggleHeadersBtn");
+      const headerToggleIcon = document.getElementById("headerToggleIcon");
+      toggleHeadersBtn.addEventListener("click", () => {
+        const isHidden = fullHeadersOutput.classList.toggle("hidden");
+        toggleHeadersBtn.setAttribute(
+          "aria-expanded",
+          isHidden ? "false" : "true"
+        );
+        headerToggleIcon.classList.toggle("rotate-180", !isHidden);
+      });
+
+      const colorClasses = {
+        green: [
+          "bg-green-50",
+          "border-green-400",
+          "text-green-800",
+          "bg-green-500",
+        ],
+        red: ["bg-red-50", "border-red-400", "text-red-800", "bg-red-500"],
+        yellow: [
+          "bg-yellow-50",
+          "border-yellow-400",
+          "text-yellow-800",
+          "bg-yellow-500",
+        ],
+        indigo: [
+          "bg-indigo-50",
+          "border-indigo-400",
+          "text-indigo-800",
+          "bg-indigo-500",
+        ],
+        gray: ["bg-gray-50", "border-gray-400", "text-gray-800", "bg-gray-500"],
+      };
+      card.classList.add(
+        "p-5",
+        "border-l-4",
+        "rounded-lg",
+        "shadow-md",
+        ...colorClasses[color].slice(0, 3)
+      );
+      card
+        .querySelector("span")
+        .classList.add(...colorClasses[color][3].split(" "));
 
       const HTTP_SCAN_KEYS = [
         "Strict-Transport-Security",
@@ -725,7 +766,6 @@
           );
         }
 
-        // Correctly reference full_headers from the result
         const headersToShow = full_headers || {};
         const formattedHeaders = Object.keys(headersToShow)
           .map((key) => `${key}: ${headersToShow[key]}`)
