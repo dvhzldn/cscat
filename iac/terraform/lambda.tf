@@ -114,3 +114,31 @@ resource "aws_lambda_function" "fingerprint_scanner_function" {
   filename         = data.archive_file.fingerprint_zip.output_path
   source_code_hash = data.archive_file.fingerprint_zip.output_base64sha256
 }
+
+######################################################
+# ALLOW API GATEWAY TO INVOKE LAMBDAS
+######################################################
+locals {
+  lambda_functions = {
+    scan        = aws_lambda_function.scanner_function.function_name
+    dns         = aws_lambda_function.dns_scanner_function.function_name
+    fingerprint = aws_lambda_function.fingerprint_scanner_function.function_name
+  }
+}
+
+resource "aws_lambda_permission" "api_gateway_invoke" {
+  for_each = local.lambda_functions
+
+  statement_id  = "AllowExecutionFromAPIGateway-${each.key}"
+  action        = "lambda:InvokeFunction"
+  function_name = each.value
+  principal     = "apigateway.amazonaws.com"
+
+  # Allow only the relevant API Gateway method/resource
+  source_arn = "${aws_api_gateway_rest_api.scanner_api.execution_arn}/*/POST/${each.key}"
+
+  # Ensure Lambda and API Gateway exist before adding permission
+  depends_on = [
+    aws_api_gateway_rest_api.scanner_api
+  ]
+}
