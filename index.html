@@ -493,15 +493,14 @@
           failed:
             "Missing. Allows any third-party website to embed the site's resources, potentially leading to data theft via side-channel attacks.",
         },
-
         SPF: {
           title: "SPF (Sender Policy Framework)",
           description:
-            "Specifies which mail servers are authori**s**ed to send email on behalf of the domain, which prevents email spoofing.",
+            "Specifies which mail servers are authorised to send email on behalf of the domain, which prevents email spoofing.",
           passed:
             "SPF record found. Authorised mail servers are clearly defined.",
           failed:
-            "No valid SPF record found. The domain is easily spoofable by unauthori**s**ed third parties for phishing attacks.",
+            "No valid SPF record found. The domain is easily spoofable by unauthorised third parties for phishing attacks.",
           warning:
             "Multiple SPF records found (RFC violation) or missing a proper fail mechanism.",
         },
@@ -584,14 +583,7 @@
       const checksContainer = document.getElementById("checksContainer");
       const toggleIcon = document.getElementById("toggleIcon");
       const headerToggleIcon = document.getElementById("headerToggleIcon");
-      toggleHeadersBtn.addEventListener("click", () => {
-        const isHidden = fullHeadersOutput.classList.toggle("hidden");
-        toggleHeadersBtn.setAttribute(
-          "aria-expanded",
-          isHidden ? "false" : "true"
-        );
-        headerToggleIcon.classList.toggle("rotate-180", !isHidden);
-      });
+      const toggleHeadersBtn = document.getElementById("toggleHeadersBtn");
 
       const colorClasses = {
         green: [
@@ -615,16 +607,6 @@
         ],
         gray: ["bg-gray-50", "border-gray-400", "text-gray-800", "bg-gray-500"],
       };
-      card.classList.add(
-        "p-5",
-        "border-l-4",
-        "rounded-lg",
-        "shadow-md",
-        ...colorClasses[color].slice(0, 3)
-      );
-      card
-        .querySelector("span")
-        .classList.add(...colorClasses[color][3].split(" "));
 
       const HTTP_SCAN_KEYS = [
         "Strict-Transport-Security",
@@ -641,17 +623,25 @@
       const FINGERPRINT_KEYS = ["Server", "X_Powered_By", "Technology_Stack"];
       const DNS_KEYS = ["SPF", "DMARC", "DKIM", "DNSSEC"];
 
+      // --- Event Listeners ---
       if (toggleHeadersBtn) {
         toggleHeadersBtn.addEventListener("click", () => {
           const isHidden = fullHeadersOutput.classList.toggle("hidden");
-          toggleHeadersBtn.setAttribute(
-            "aria-expanded",
-            isHidden ? "false" : "true"
-          );
-          toggleIcon.classList.toggle("rotate-180", !isHidden);
+          toggleHeadersBtn.setAttribute("aria-expanded", !isHidden);
+          if (headerToggleIcon)
+            headerToggleIcon.classList.toggle("rotate-180", !isHidden);
         });
       }
 
+      if (toggleChecksBtn) {
+        toggleChecksBtn.addEventListener("click", () => {
+          const isHidden = checksContainer.classList.toggle("hidden");
+          toggleChecksBtn.setAttribute("aria-expanded", !isHidden);
+          if (toggleIcon) toggleIcon.classList.toggle("rotate-180", !isHidden);
+        });
+      }
+
+      // --- Utility Functions ---
       function showMessage(message, type = "error") {
         messageBox.textContent = message;
         messageBox.className = `mt-4 p-4 text-sm rounded-lg border ${
@@ -668,6 +658,7 @@
         scanIcon.classList.toggle("hidden", isLoading);
         buttonText.textContent = isLoading ? "Scanning..." : "Run a scan";
       }
+
       function createCard(checkKey, status, value, notes) {
         const details = CHECK_DETAILS[checkKey] || {
           title: checkKey,
@@ -676,10 +667,8 @@
           failed: "Check failed.",
           warning: "Check passed with a warning.",
         };
-
-        let color = "gray";
-        let statusMessage = "";
-
+        let color = "gray",
+          statusMessage = "";
         if (status === "PASSED") {
           color = "green";
           statusMessage = details.passed;
@@ -696,38 +685,29 @@
           color = "indigo";
           statusMessage = notes || "Check executed.";
         } else {
-          color = "gray";
           statusMessage = notes || "Status not determined.";
         }
-
         const card = document.createElement("div");
         card.className = `p-5 border-l-4 rounded-lg shadow-md bg-${color}-50 border-${color}-400`;
         card.innerHTML = `
-            <div class="flex justify-between items-start mb-2">
-                <h3 class="text-xl font-bold text-${color}-800">${
-          details.title
-        }</h3>
-                <span class="px-3 py-1 rounded-full text-xs font-bold bg-${color}-500 text-white">${status}</span>
-            </div>
-
-            <p class="text-sm text-gray-700 mb-3 italic">${
-              details.description
-            }</p>
-
-            <div class="mt-3 p-3 rounded bg-white border border-gray-200">
-                <p class="text-sm font-semibold text-gray-800 mb-1">Implication:</p>
-                <p class="text-sm text-${color}-700">${statusMessage}</p>
-            </div>
-
-            ${
-              value
-                ? `<div class="mt-3">
-                    <p class="text-sm font-semibold text-gray-800 mb-1">Value Found:</p>
-                    <p class="text-xs font-mono break-all bg-gray-100 p-2 rounded">${value}</p>
-                    </div>`
-                : ""
-            }
-        `;
+    <div class="flex justify-between items-start mb-2">
+      <h3 class="text-xl font-bold text-${color}-800">${details.title}</h3>
+      <span class="px-3 py-1 rounded-full text-xs font-bold bg-${color}-500 text-white">${status}</span>
+    </div>
+    <p class="text-sm text-gray-700 mb-3 italic">${details.description}</p>
+    <div class="mt-3 p-3 rounded bg-white border border-gray-200">
+      <p class="text-sm font-semibold text-gray-800 mb-1">Implication:</p>
+      <p class="text-sm text-${color}-700">${statusMessage}</p>
+    </div>
+    ${
+      value
+        ? `<div class="mt-3">
+      <p class="text-sm font-semibold text-gray-800 mb-1">Value Found:</p>
+      <p class="text-xs font-mono break-all bg-gray-100 p-2 rounded">${value}</p>
+    </div>`
+        : ""
+    }
+  `;
         return card;
       }
 
@@ -901,9 +881,8 @@
         if (
           !targetUrl.startsWith("http://") &&
           !targetUrl.startsWith("https://")
-        ) {
+        )
           targetUrl = "https://" + targetUrl;
-        }
 
         let urlObject;
         try {
@@ -913,9 +892,9 @@
           toggleLoading(false);
           return;
         }
-
         const targetDomain = urlObject.hostname;
         const httpTargetUrl = urlObject.origin + urlObject.pathname;
+
         const checks = Array.from(
           form.querySelectorAll('input[name="checks"]:checked')
         ).map((c) => c.value);
@@ -932,7 +911,6 @@
           fingerprint_results: {},
         };
 
-        // <<< UPDATED <<< Use safeFetch for all API calls
         const httpScanPromise = safeFetch(`${API_BASE_URL}/scan`, {
           url: httpTargetUrl,
           checks: httpChecks,
