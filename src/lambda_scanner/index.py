@@ -1,10 +1,6 @@
 import json
 import requests
-from urllib.parse import urlparse, urlunparse
-import logging
-
-logger = logging.getLogger()
-logger.setLevel(logging.INFO)
+from urllib.parse import urlparse
 
 CORS_HEADERS = {
     "Access-Control-Allow-Origin": "*",
@@ -24,6 +20,18 @@ def respond(status_code, body):
         "headers": CORS_HEADERS,
         "body": json.dumps(body),
     }
+
+
+HTTP_HEADERS_TO_CHECK = [
+    "Strict-Transport-Security",
+    "X-Frame-Options",
+    "X-Content-Type-Options",
+    "Content-Security-Policy",
+    "Referrer-Policy",
+    "Permissions-Policy",
+    "Cross-Origin-Opener-Policy",
+    "Cross-Origin-Resource-Policy",
+]
 
 
 def scan_url(url: str, checks: list[str]) -> list[dict]:
@@ -134,31 +142,40 @@ def lambda_handler(event, context):
         return respond(200, {"message": "CORS preflight OK"})
 
     try:
-        try:
-            body = json.loads(event.get("body") or "{}")
-        except json.JSONDecodeError:
-            return respond(400, {"error": "Invalid JSON in request body"})
-
+        body = json.loads(event.get("body") or "{}")
         url = body.get("url")
-        checks = body.get("checks", [])
+        checks = body.get("checks") or HTTP_HEADERS_TO_CHECK
 
         if not url:
-            return respond(400, {"error": "Missing URL in request body"})
+            return respond(400, {"error": "Missing URL in request body."})
+
+        parsed_url = urlparse(url)
+        if not parsed_url.scheme:
+            url = "https://" + url
+        parsed_url = urlparse(url)
+        if not parsed_url.netloc:
+            return respond(400, {"error": f"Invalid URL: {url}"})
 
         try:
-            results = scan_url(url, checks)
+            response = requests.get(url, timeout=10, allow_redirects=False)
+            headers = {k: v for k, v in response.headers.items()}
+        except requests.exceptions.RequestException as e:
+            return respond(
+                200, {"results": {"error": f"Failed to fetch URL: {str(e)}"}}
+            )
         except Exception as e:
-            logger.error(f"Scan failed: {e}", exc_info=True)
-            results = [
-                {
-                    "url": url,
-                    "error_message": f"Scan failed: {str(e)}",
-                    "security_findings": {},
-                }
-            ]
+            return respond(200, {"results": {"error": f"Unexpected error: {str(e)}"}})
 
-        return respond(200, {"results": results})
+        results = {}
+        for header in checks:
+            value = headers.get(header)
+            results[header] = {
+                "status": "PASSED" if value else "FAILED",
+                "value": value or "Not set",
+                "notes": f"{header} is {'present' if value else 'missing'}.",
+            }
+
+        return respond(200, {"results": results, "full_headers": headers})
 
     except Exception as e:
-        logger.error(f"Unexpected error: {e}", exc_info=True)
-        return respond(500, {"error": f"Internal server error: {str(e)}"})
+        return respond(200, {"results": {"error": f"Internal error: {str(e)}"}})
