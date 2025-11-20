@@ -15,7 +15,7 @@ DevSecOps principles.
 
 ## Live demo
 
-[https://cscat-security-reports-261111.s3.eu-west-2.amazonaws.com/index.html](cscat-security-reports-261111.s3.eu-west-2.amazonaws.com/index.html)
+[Link](https://cscat-security-reports-261111.s3.eu-west-2.amazonaws.com/index.html)
 
 ## Key features
 
